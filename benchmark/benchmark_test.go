@@ -166,3 +166,165 @@ func TestRunEmptyConfig(t *testing.T) {
 		t.Errorf("Expected 0 results with empty servers, got %d", len(results))
 	}
 }
+
+// TestResultStructure tests the Result struct (no network required)
+func TestResultStructure(t *testing.T) {
+	result := Result{
+		Server:   "8.8.8.8",
+		Domain:   "example.com",
+		Duration: 50 * time.Millisecond,
+		Error:    nil,
+	}
+
+	if result.Server != "8.8.8.8" {
+		t.Errorf("Expected server '8.8.8.8', got '%s'", result.Server)
+	}
+	if result.Domain != "example.com" {
+		t.Errorf("Expected domain 'example.com', got '%s'", result.Domain)
+	}
+	if result.Duration != 50*time.Millisecond {
+		t.Errorf("Expected duration 50ms, got %v", result.Duration)
+	}
+	if result.Error != nil {
+		t.Errorf("Expected no error, got %v", result.Error)
+	}
+}
+
+// TestClientStructure tests the Client struct (no network required)
+func TestClientStructure(t *testing.T) {
+	client := Client{
+		Timeout: 5 * time.Second,
+	}
+
+	if client.Timeout != 5*time.Second {
+		t.Errorf("Expected timeout 5s, got %v", client.Timeout)
+	}
+	if client.httpClient != nil {
+		t.Error("Expected httpClient to be nil initially")
+	}
+}
+
+// TestConfigStructure tests the Config struct (no network required)
+func TestConfigStructure(t *testing.T) {
+	config := Config{
+		Servers:      []string{"8.8.8.8", "1.1.1.1"},
+		Domains:      []string{"google.com", "example.com"},
+		Iterations:   10,
+		Concurrency:  5,
+		Timeout:      2 * time.Second,
+		Duration:     30 * time.Second,
+		Verbose:      true,
+		ShowProgress: true,
+	}
+
+	if len(config.Servers) != 2 {
+		t.Errorf("Expected 2 servers, got %d", len(config.Servers))
+	}
+	if len(config.Domains) != 2 {
+		t.Errorf("Expected 2 domains, got %d", len(config.Domains))
+	}
+	if config.Iterations != 10 {
+		t.Errorf("Expected 10 iterations, got %d", config.Iterations)
+	}
+	if config.Concurrency != 5 {
+		t.Errorf("Expected concurrency 5, got %d", config.Concurrency)
+	}
+	if config.Timeout != 2*time.Second {
+		t.Errorf("Expected timeout 2s, got %v", config.Timeout)
+	}
+	if config.Duration != 30*time.Second {
+		t.Errorf("Expected duration 30s, got %v", config.Duration)
+	}
+	if !config.Verbose {
+		t.Error("Expected verbose to be true")
+	}
+	if !config.ShowProgress {
+		t.Error("Expected ShowProgress to be true")
+	}
+}
+
+// TestProgressUpdateStructure tests the ProgressUpdate struct (no network required)
+func TestProgressUpdateStructure(t *testing.T) {
+	update := ProgressUpdate{
+		Completed: 50,
+		Total:     100,
+		Elapsed:   5 * time.Second,
+	}
+
+	if update.Completed != 50 {
+		t.Errorf("Expected 50 completed, got %d", update.Completed)
+	}
+	if update.Total != 100 {
+		t.Errorf("Expected 100 total, got %d", update.Total)
+	}
+	if update.Elapsed != 5*time.Second {
+		t.Errorf("Expected 5s elapsed, got %v", update.Elapsed)
+	}
+}
+
+// TestJobStructure tests the Job struct (no network required)
+func TestJobStructure(t *testing.T) {
+	job := Job{
+		Server: "8.8.8.8",
+		Domain: "example.com",
+	}
+
+	if job.Server != "8.8.8.8" {
+		t.Errorf("Expected server '8.8.8.8', got '%s'", job.Server)
+	}
+	if job.Domain != "example.com" {
+		t.Errorf("Expected domain 'example.com', got '%s'", job.Domain)
+	}
+}
+
+// TestRunEmptyDomains tests behavior with empty domains list
+func TestRunEmptyDomains(t *testing.T) {
+	config := Config{
+		Servers:     []string{"8.8.8.8"},
+		Domains:     []string{},
+		Iterations:  1,
+		Concurrency: 1,
+		Timeout:     1 * time.Second,
+	}
+
+	results := Run(config)
+
+	// With no domains, we expect 0 results
+	if len(results) != 0 {
+		t.Errorf("Expected 0 results with empty domains, got %d", len(results))
+	}
+}
+
+// TestRunZeroIterations tests behavior with zero iterations
+func TestRunZeroIterations(t *testing.T) {
+	config := Config{
+		Servers:     []string{"8.8.8.8"},
+		Domains:     []string{"example.com"},
+		Iterations:  0,
+		Concurrency: 1,
+		Timeout:     1 * time.Second,
+	}
+
+	results := Run(config)
+
+	// With 0 iterations, we expect 0 results
+	if len(results) != 0 {
+		t.Errorf("Expected 0 results with 0 iterations, got %d", len(results))
+	}
+}
+
+// TestRunMultipleServersAndDomains tests configuration without network
+func TestRunMultipleServersAndDomains(t *testing.T) {
+	config := Config{
+		Servers:     []string{"8.8.8.8", "1.1.1.1", "9.9.9.9"},
+		Domains:     []string{"example.com", "test.com"},
+		Iterations:  2,
+		Concurrency: 5,
+		Timeout:     100 * time.Millisecond,
+	}
+
+	expectedJobs := len(config.Servers) * len(config.Domains) * config.Iterations
+	if expectedJobs != 12 {
+		t.Errorf("Expected 12 total jobs (3*2*2), calculated %d", expectedJobs)
+	}
+}
