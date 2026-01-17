@@ -1,0 +1,43 @@
+name: DNS Benchmark CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test and Build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.25'
+        cache: true
+
+    - name: Get dependencies
+      run: go mod download
+
+    - name: Run Unit Tests
+      run: go test -v ./...
+
+    - name: Build (macOS)
+      run: go build -o dns-bench-macos
+
+    - name: Build (Linux AMD64)
+      run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dns-bench-linux-amd64
+
+    - name: Build (Linux ARM64)
+      run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o dns-bench-linux-arm64
+
+    - name: Build (Windows AMD64)
+      run: CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o dns-bench-windows-amd64.exe
+
+    - name: Verify Artifacts
+      run: ls -lh dns-bench-*
