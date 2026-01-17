@@ -42,11 +42,11 @@ jobs:
         # Only run if a tag was created. Check if we are on a tag?
         # Semantic release pushes the tag, but the local checkout might not have it updated?
         # We fetch tags first.
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         if: success() # Run even if previous step succeeded (how do we know if it released?)
         with:
           distribution: goreleaser
-          version: latest
+          version: ~> v2
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
