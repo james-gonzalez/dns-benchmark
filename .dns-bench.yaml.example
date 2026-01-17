@@ -1,0 +1,29 @@
+# DNS Benchmark Configuration File
+# Save this as .dns-bench.yaml in your home directory or current directory
+
+# Default servers to test
+servers:
+  - 8.8.8.8                      # Google DNS (UDP)
+  - 1.1.1.1                      # Cloudflare (UDP)
+  - tls://1.1.1.1                # Cloudflare (DoT)
+  - https://dns.google/dns-query # Google (DoH)
+  - 9.9.9.9                      # Quad9 (UDP)
+
+# Default domains to query (leave empty to use built-in defaults)
+domains: []
+
+# Benchmark settings
+concurrency: 50    # Number of concurrent queries
+iterations: 1      # Number of iterations per domain per server
+timeout: 1s        # Timeout for each query
+duration: 0s       # Duration to run (overrides iterations if set, e.g., "30s")
+
+# Output options
+verbose: false     # Show errors and slow queries
+progress: false    # Show progress bar
+
+# File paths (optional)
+# domain_file: domains.csv
+# server_file: servers.yaml
+# export_csv: results.csv
+# export_html: report.html

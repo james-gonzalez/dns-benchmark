@@ -7,6 +7,47 @@ on:
     branches: [ main ]
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25.6'
+        cache: true
+
+    - name: Install golangci-lint
+      run: |
+        # Install golangci-lint from source with Go 1.25
+        go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+    - name: Run golangci-lint
+      run: |
+        # Use the installed golangci-lint (built with Go 1.25)
+        $(go env GOPATH)/bin/golangci-lint run --timeout=5m
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25.6'
+        cache: true
+
+    - name: Run govulncheck
+      run: |
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        $(go env GOPATH)/bin/govulncheck ./...
+
   test:
     name: Test and Build
     runs-on: ubuntu-latest
@@ -25,10 +66,27 @@ jobs:
       run: go mod download
 
     - name: Run Unit Tests
-      run: go test -v ./...
+      run: go test -v -race -short -coverprofile=coverage.out ./...
 
-    - name: Build (macOS)
-      run: go build -o dns-bench-macos
+    - name: Generate Coverage Report
+      run: go tool cover -html=coverage.out -o coverage.html
+
+    - name: Upload Coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: |
+          coverage.out
+          coverage.html
+
+    - name: Check Coverage Threshold
+      run: |
+        coverage=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+        echo "Total coverage: ${coverage}%"
+        if (( $(echo "$coverage < 50" | bc -l) )); then
+          echo "Coverage is below 50%"
+          exit 1
+        fi
 
     - name: Build (Linux AMD64)
       run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dns-bench-linux-amd64
@@ -39,5 +97,17 @@ jobs:
     - name: Build (Windows AMD64)
       run: CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o dns-bench-windows-amd64.exe
 
+    - name: Build (macOS AMD64)
+      run: CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o dns-bench-darwin-amd64
+
+    - name: Build (macOS ARM64)
+      run: CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o dns-bench-darwin-arm64
+
     - name: Verify Artifacts
       run: ls -lh dns-bench-*
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: binaries
+        path: dns-bench-*

@@ -1,0 +1,121 @@
+# Golangci-lint configuration for dns-bench
+# Documentation: https://golangci-lint.run/docs/configuration/
+
+# Run options
+run:
+  timeout: 5m
+  tests: true
+  build-tags: []
+  modules-download-mode: readonly
+  go: '1.25'
+
+# Linters configuration
+linters:
+  # Enable specific linters
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gofmt
+    - goimports
+    - misspell
+    - revive
+    - typecheck
+    - unconvert
+    - unparam
+    - gocritic
+    - gosec
+    - bodyclose
+    - noctx
+    - prealloc
+    - gocyclo
+  
+  # Linter-specific settings
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    
+    govet:
+      enable-all: true
+      disable:
+        - shadow
+    
+    gocyclo:
+      min-complexity: 15
+    
+    gofmt:
+      simplify: true
+    
+    goimports:
+      local-prefixes: dns-bench
+    
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+        - experimental
+        - opinionated
+    
+    revive:
+      rules:
+        - name: exported
+          severity: warning
+          disabled: false
+        - name: unexported-return
+          severity: warning
+        - name: error-strings
+          severity: warning
+        - name: error-naming
+          severity: warning
+        - name: indent-error-flow
+          severity: warning
+    
+    staticcheck:
+      checks: ["all"]
+
+# Issues configuration
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  
+  exclusions:
+    generated: strict
+    
+    # Exclusion rules per-path, per-linter
+    rules:
+      # Exclude some linters from running on test files
+      - path: _test\.go
+        linters:
+          - gocyclo
+          - errcheck
+          - dupl
+          - gosec
+      
+      # Exclude known issue with InsecureSkipVerify - intentional for benchmarking
+      - path: benchmark/benchmark\.go
+        text: "G402: TLS InsecureSkipVerify set true"
+        linters:
+          - gosec
+      
+      # Allow fmt.Printf in main for CLI output
+      - path: main\.go
+        text: "use of `fmt.Printf`"
+        linters:
+          - forbidigo
+    
+    # Exclude directories
+    paths:
+      - vendor
+
+# Output configuration
+output:
+  formats:
+    - format: colored-line-number
+      path: stdout
+  print-linter-name: true
+  print-issued-lines: true
