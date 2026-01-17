@@ -1,0 +1,27 @@
+servers:
+  # --- Standard UDP ---
+  - 1.1.1.1                         # Cloudflare
+  - 8.8.8.8                         # Google
+  - 9.9.9.9                         # Quad9
+  - 192.168.86.80                   # Local
+  - 192.168.86.90                   # Local
+  - 208.67.222.222                  # OpenDNS
+  - 76.76.2.0                       # ControlD (Unfiltered)
+  - 84.200.69.80                    # DNS.WATCH
+  - 94.140.14.14                    # AdGuard (Default)
+
+  # --- DoT (DNS over TLS) ---
+  - tls://1.1.1.1                   # Cloudflare DoT
+  - tls://dns.google                # Google DoT
+  - tls://dns.quad9.net             # Quad9 DoT
+  - tls://p0.freedns.controld.com   # ControlD DoT
+  - tls://dns.adguard-dns.com       # AdGuard DoT
+  - tls://dns.mullvad.net           # Mullvad DoT
+
+  # --- DoH (DNS over HTTPS) ---
+  - https://cloudflare-dns.com/dns-query   # Cloudflare DoH
+  - https://dns.google/dns-query           # Google DoH
+  - https://dns.quad9.net/dns-query        # Quad9 DoH
+  - https://freedns.controld.com/p0        # ControlD DoH
+  - https://dns.adguard-dns.com/dns-query  # AdGuard DoH
+  - https://dns.mullvad.net/dns-query      # Mullvad DoH
