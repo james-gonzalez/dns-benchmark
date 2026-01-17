@@ -1,6 +1,6 @@
 module dns-bench
 
-go 1.23
+go 1.25.6
 
 require github.com/miekg/dns v1.1.70
 
