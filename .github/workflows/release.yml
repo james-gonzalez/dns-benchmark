@@ -31,14 +31,18 @@ jobs:
           node-version: "lts/*"
 
       - name: Install Semantic Release
-        run: npm install -g semantic-release @semantic-release/git @semantic-release/changelog
+        run: npm install -g semantic-release
 
       - name: Run Semantic Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx semantic-release
 
+      - name: Sync Tags
+        run: git fetch --tags origin
+
       - name: Run GoReleaser
+
         # Only run if a tag was created. Check if we are on a tag?
         # Semantic release pushes the tag, but the local checkout might not have it updated?
         # We fetch tags first.
