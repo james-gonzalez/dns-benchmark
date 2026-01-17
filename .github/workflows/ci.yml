@@ -36,5 +36,8 @@ jobs:
     - name: Build (Linux ARM64)
       run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o dns-bench-linux-arm64
 
+    - name: Build (Windows AMD64)
+      run: CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o dns-bench-windows-amd64.exe
+
     - name: Verify Artifacts
       run: ls -lh dns-bench-*
