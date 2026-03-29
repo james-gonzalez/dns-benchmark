@@ -215,7 +215,7 @@ func main() {
 	flag.StringVar(&serverFile, "servers", "", "File containing list of servers (one per line or YAML)")
 	flag.StringVar(&exportFile, "o", "", "Output CSV file for raw results")
 	flag.StringVar(&htmlFile, "html", "", "Output HTML report file")
-	flag.StringVar(&browserName, "browser", "", "Import domains from browser history (chrome, brave, safari, firefox)")
+	flag.StringVar(&browserName, "browser", "", "Import domains from browser history (chrome, brave, edge, firefox, safari, opera [Windows only])")
 	flag.BoolVar(&verbose, "v", false, "Verbose logging (show errors and slow queries)")
 	flag.BoolVar(&showProgress, "progress", false, "Show progress bar during benchmark")
 	flag.Parse()

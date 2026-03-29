@@ -14,46 +14,20 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// browserConfig holds the resolved path and query for a browser
+type browserConfig struct {
+	historyPath string
+	query       string
+}
+
 // GetDomains extracts unique domains from the specified browser's history
 func GetDomains(browserName string, limit int) ([]string, error) {
-	home, err := os.UserHomeDir()
+	cfg, err := resolveBrowser(browserName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user home dir: %v", err)
+		return nil, err
 	}
 
-	var historyPath string
-	var query string
-
-	switch strings.ToLower(browserName) {
-	case "chrome":
-		historyPath = filepath.Join(home, "Library", "Application Support", "Google", "Chrome", "Default", "History")
-		query = "SELECT url FROM urls ORDER BY last_visit_time DESC LIMIT ?"
-	case "brave":
-		historyPath = filepath.Join(home, "Library", "Application Support", "BraveSoftware", "Brave-Browser", "Default", "History")
-		query = "SELECT url FROM urls ORDER BY last_visit_time DESC LIMIT ?"
-	case "safari":
-		historyPath = filepath.Join(home, "Library", "Safari", "History.db")
-		query = "SELECT url FROM history_items ORDER BY visit_count DESC LIMIT ?"
-	case "firefox":
-		// Firefox profiles have random strings in the path. We need to find the correct profile.
-		profilesPath := filepath.Join(home, "Library", "Application Support", "Firefox", "Profiles")
-		matches, err := filepath.Glob(filepath.Join(profilesPath, "*.default-release"))
-		if err == nil && len(matches) == 0 {
-			// Try fallback for non-release builds or older setups
-			matches, err = filepath.Glob(filepath.Join(profilesPath, "*.default"))
-		}
-		if err != nil || len(matches) == 0 {
-			return nil, fmt.Errorf("could not locate Firefox profile")
-		}
-		if len(matches) > 0 {
-			historyPath = filepath.Join(matches[0], "places.sqlite")
-		}
-		query = "SELECT url FROM moz_places ORDER BY last_visit_date DESC LIMIT ?"
-	default:
-		return nil, fmt.Errorf("unsupported browser: %s (options: chrome, brave, safari, firefox)", browserName)
-	}
-
-	if historyPath == "" {
+	if cfg.historyPath == "" {
 		return nil, fmt.Errorf("could not locate history file for %s", browserName)
 	}
 
@@ -64,22 +38,19 @@ func GetDomains(browserName string, limit int) ([]string, error) {
 	}
 	tempPath := tempFile.Name()
 
-	// Close and ensure cleanup
 	if err := tempFile.Close(); err != nil {
 		return nil, fmt.Errorf("failed to close temp file: %v", err)
 	}
 	defer func() {
 		if err := os.Remove(tempPath); err != nil {
-			// Log but don't fail on cleanup error
 			fmt.Fprintf(os.Stderr, "Warning: failed to remove temp file: %v\n", err)
 		}
 	}()
 
-	if err := copyFile(historyPath, tempPath); err != nil {
+	if err := copyFile(cfg.historyPath, tempPath); err != nil {
 		return nil, fmt.Errorf("failed to copy history file (browser might be open?): %v", err)
 	}
 
-	// Open database
 	db, err := sql.Open("sqlite3", tempPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %v", err)
@@ -90,8 +61,8 @@ func GetDomains(browserName string, limit int) ([]string, error) {
 		}
 	}()
 
-	// Execute query
-	rows, err := db.Query(query, limit*10) // Fetch more than needed to account for dupes/non-hostnames
+	// Fetch more than needed to account for duplicates and non-hostname URLs
+	rows, err := db.Query(cfg.query, limit*10)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %v", err)
 	}
@@ -111,26 +82,26 @@ func GetDomains(browserName string, limit int) ([]string, error) {
 		}
 
 		u, err := url.Parse(rawURL)
-		if err == nil && u.Hostname() != "" {
-			host := u.Hostname()
+		if err != nil || u.Hostname() == "" {
+			continue
+		}
+		host := u.Hostname()
 
-			// Filter out localhost, IPs, and local names
-			if host == "localhost" || strings.Contains(host, "127.0.0.1") {
-				continue
-			}
-			if net.ParseIP(host) != nil {
-				continue
-			}
-			if !strings.Contains(host, ".") {
-				continue // likely a local hostname like "router" or "macbook"
-			}
+		if host == "localhost" || strings.Contains(host, "127.0.0.1") {
+			continue
+		}
+		if net.ParseIP(host) != nil {
+			continue
+		}
+		if !strings.Contains(host, ".") {
+			continue
+		}
 
-			if _, exists := domainSet[host]; !exists {
-				domainSet[host] = struct{}{}
-				domains = append(domains, host)
-				if len(domains) >= limit {
-					break
-				}
+		if _, exists := domainSet[host]; !exists {
+			domainSet[host] = struct{}{}
+			domains = append(domains, host)
+			if len(domains) >= limit {
+				break
 			}
 		}
 	}
@@ -170,4 +141,16 @@ func copyFile(src, dst string) error {
 
 	_, err = io.Copy(destination, source)
 	return err
+}
+
+// findFirefoxProfile returns the path to the most likely Firefox places.sqlite
+// by globbing for *.default-release then *.default profiles.
+func findFirefoxProfile(profilesPath string) (string, error) {
+	for _, pattern := range []string{"*.default-release", "*.default"} {
+		matches, err := filepath.Glob(filepath.Join(profilesPath, pattern))
+		if err == nil && len(matches) > 0 {
+			return filepath.Join(matches[0], "places.sqlite"), nil
+		}
+	}
+	return "", fmt.Errorf("could not locate Firefox profile in %s", profilesPath)
 }
