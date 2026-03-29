@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dns-bench-results
+  namespace: dns-benchmark
+spec:
+  # ReadWriteMany allows the CronJob pod and the nginx Deployment to mount
+  # the same volume simultaneously. Requires an RWX-capable storage class
+  # (e.g. NFS, Longhorn, Rook-Ceph, or AWS EFS).
+  #
+  # If your cluster only supports ReadWriteOnce (e.g. local-path), change this
+  # back to ReadWriteOnce and ensure the nginx pod is scheduled on the same
+  # node as the CronJob by adding a nodeSelector to both.
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn-rwx

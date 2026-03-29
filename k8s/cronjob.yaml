@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: dns-bench
+  namespace: dns-benchmark
+  labels:
+    app: dns-bench
+spec:
+  # Run at 06:00, 12:00, and 18:00 UTC every day
+  schedule: "0 6,12,18 * * *"
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid        # skip if previous run is still going
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 3600
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: dns-bench
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: dns-bench
+              image: ghcr.io/james-gonzalez/dns-benchmark:latest
+              imagePullPolicy: Always
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 128Mi
+                limits:
+                  cpu: 1000m
+                  memory: 256Mi
+              volumeMounts:
+                - name: config
+                  mountPath: /config
+                  readOnly: true
+                - name: results
+                  mountPath: /results
+          volumes:
+            - name: config
+              configMap:
+                name: dns-bench-config
+            - name: results
+              persistentVolumeClaim:
+                claimName: dns-bench-results

@@ -1,0 +1,156 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dns-bench-config
+  namespace: dns-benchmark
+data:
+  # ── Server list ─────────────────────────────────────────────────────────────
+  servers.yaml: |
+    servers:
+      # Local DNS servers
+      - 192.168.86.80
+      - 192.168.86.90
+
+      # UK-based providers
+      - https://dns.aa.net.uk/dns-query
+      - https://doh.dnscrypt.uk/dns-query
+
+      # Cloudflare
+      - https://1.1.1.1/dns-query
+      - https://1.0.0.1/dns-query
+      - https://cloudflare-dns.com/dns-query
+
+      # Google
+      - https://dns.google/dns-query
+      - https://8.8.8.8/dns-query
+
+      # Quad9
+      - https://dns.quad9.net/dns-query
+
+      # Mullvad
+      - https://doh.mullvad.net/dns-query
+
+      # AdGuard
+      - https://dns.adguard-dns.com/dns-query
+
+      # NextDNS
+      - https://dns.nextdns.io/dns-query
+
+      # Control D
+      - https://freedns.controld.com/p0
+
+      # OpenDNS
+      - https://dns.opendns.com/dns-query
+
+      # DNS.SB
+      - https://doh.sb/dns-query
+
+  # ── Domain list (UK-relevant mix) ───────────────────────────────────────────
+  domains.txt: |
+    # UK News & Media
+    bbc.co.uk
+    bbc.com
+    theguardian.com
+    thetimes.co.uk
+    telegraph.co.uk
+    independent.co.uk
+    dailymail.co.uk
+    mirror.co.uk
+    sky.com
+    itv.com
+    channel4.com
+    metro.co.uk
+
+    # UK Government & Public Services
+    gov.uk
+    nhs.uk
+    hmrc.gov.uk
+    dvla.gov.uk
+    parliament.uk
+    police.uk
+    royalmail.com
+
+    # UK Retail & E-commerce
+    amazon.co.uk
+    ebay.co.uk
+    argos.co.uk
+    johnlewis.com
+    marksandspencer.com
+    tesco.com
+    sainsburys.co.uk
+    asda.com
+    currys.co.uk
+    boots.com
+    next.co.uk
+    asos.com
+    very.co.uk
+    ao.com
+
+    # UK Banking & Finance
+    barclays.co.uk
+    hsbc.co.uk
+    lloydsbank.com
+    natwest.com
+    santander.co.uk
+    monzo.com
+    revolut.com
+    starlingbank.com
+    halifax.co.uk
+    nationwide.co.uk
+
+    # UK Telecoms & Utilities
+    bt.com
+    sky.com
+    virginmedia.com
+    vodafone.co.uk
+    o2.co.uk
+    ee.co.uk
+    three.co.uk
+    talktalk.co.uk
+    plusnet.com
+    britishgas.co.uk
+    sse.com
+    octopusenergy.com
+
+    # UK Travel & Transport
+    nationalrail.co.uk
+    tfl.gov.uk
+    britishairways.com
+    easyjet.com
+    ryanair.com
+    trainline.com
+    booking.com
+    airbnb.co.uk
+    tripadvisor.co.uk
+
+    # Global Tech (heavily used in UK)
+    google.co.uk
+    google.com
+    youtube.com
+    facebook.com
+    instagram.com
+    twitter.com
+    linkedin.com
+    microsoft.com
+    apple.com
+    amazon.com
+    netflix.com
+    spotify.com
+    whatsapp.com
+    tiktok.com
+    reddit.com
+    wikipedia.org
+    github.com
+    stackoverflow.com
+    discord.com
+    zoom.us
+    slack.com
+    dropbox.com
+    cloudflare.com
+
+    # CDN & Infrastructure (good latency indicators)
+    cdn.jsdelivr.net
+    cdnjs.cloudflare.com
+    ajax.googleapis.com
+    fonts.googleapis.com
+    static.cloudflareinsights.com

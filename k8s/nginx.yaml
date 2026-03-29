@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dns-bench-web
+  namespace: dns-benchmark
+  labels:
+    app: dns-bench-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dns-bench-web
+  template:
+    metadata:
+      labels:
+        app: dns-bench-web
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: results
+              mountPath: /usr/share/nginx/html
+              readOnly: true
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: nginx.conf
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
+      volumes:
+        - name: results
+          persistentVolumeClaim:
+            claimName: dns-bench-results
+        - name: nginx-config
+          configMap:
+            name: dns-bench-nginx-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dns-bench-nginx-config
+  namespace: dns-benchmark
+data:
+  nginx.conf: |
+    server {
+        listen 80;
+        server_name _;
+        root /usr/share/nginx/html;
+        index index.html;
+
+        # Pretty directory listing as fallback
+        autoindex on;
+        autoindex_exact_size off;
+        autoindex_localtime on;
+
+        location / {
+            try_files $uri $uri/ =404;
+        }
+
+        # Cache static assets briefly
+        location ~* \.(css|js)$ {
+            expires 1h;
+            add_header Cache-Control "public";
+        }
+
+        # Never cache the dashboard itself
+        location = /index.html {
+            add_header Cache-Control "no-store";
+        }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dns-bench-web
+  namespace: dns-benchmark
+  labels:
+    app: dns-bench-web
+spec:
+  selector:
+    app: dns-bench-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      # Uncomment and set a nodePort (30000-32767) to expose directly on each node:
+      # nodePort: 30080
+  # Change to NodePort if you don't have an Ingress controller:
+  type: ClusterIP

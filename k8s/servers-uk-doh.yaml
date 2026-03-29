@@ -1,0 +1,38 @@
+servers:
+  # ── Local DNS servers ──────────────────────────────────────────────────────
+  - 192.168.86.80                              # Local DNS (primary)
+  - 192.168.86.90                              # Local DNS (secondary)
+
+  # ── UK-based providers ────────────────────────────────────────────────────
+  - https://dns.aa.net.uk/dns-query            # Andrews & Arnold (London, UK ISP)
+  - https://doh.dnscrypt.uk/dns-query          # dnscrypt.uk (UK-hosted, DigitalOcean)
+
+  # ── Cloudflare ────────────────────────────────────────────────────────────
+  - https://1.1.1.1/dns-query                  # Cloudflare DoH (primary)
+  - https://1.0.0.1/dns-query                  # Cloudflare DoH (secondary)
+  - https://cloudflare-dns.com/dns-query        # Cloudflare DoH (named endpoint)
+
+  # ── Google ────────────────────────────────────────────────────────────────
+  - https://dns.google/dns-query               # Google DoH (primary)
+  - https://8.8.8.8/dns-query                  # Google DoH (IP endpoint)
+
+  # ── Quad9 ─────────────────────────────────────────────────────────────────
+  - https://dns.quad9.net/dns-query            # Quad9 DoH (security filtering)
+
+  # ── Mullvad ───────────────────────────────────────────────────────────────
+  - https://doh.mullvad.net/dns-query          # Mullvad DoH (no logging, ad blocking)
+
+  # ── AdGuard ───────────────────────────────────────────────────────────────
+  - https://dns.adguard-dns.com/dns-query      # AdGuard DoH (ad/tracker blocking)
+
+  # ── NextDNS ───────────────────────────────────────────────────────────────
+  - https://dns.nextdns.io/dns-query           # NextDNS DoH (customisable)
+
+  # ── Control D ─────────────────────────────────────────────────────────────
+  - https://freedns.controld.com/p0            # Control D DoH (unfiltered)
+
+  # ── OpenDNS ───────────────────────────────────────────────────────────────
+  - https://dns.opendns.com/dns-query          # OpenDNS DoH
+
+  # ── DNS.SB ────────────────────────────────────────────────────────────────
+  - https://doh.sb/dns-query                   # DNS.SB DoH (no logging, DNSSEC)
