@@ -91,7 +91,4 @@ spec:
     - name: http
       port: 80
       targetPort: 80
-      # Uncomment and set a nodePort (30000-32767) to expose directly on each node:
-      # nodePort: 30080
-  # Change to NodePort if you don't have an Ingress controller:
   type: ClusterIP

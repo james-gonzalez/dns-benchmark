@@ -22,6 +22,15 @@ spec:
             app: dns-bench
         spec:
           restartPolicy: OnFailure
+          # Use 8.8.8.8 directly for DNS resolution so DoH server hostnames
+          # (dns.google, dns.quad9.net, etc.) resolve to their real public IPs
+          # rather than being intercepted by the cluster's internal DNS/gateway.
+          dnsPolicy: None
+          dnsConfig:
+            nameservers:
+              - 8.8.8.8
+              - 1.1.1.1
+            searches: []
           containers:
             - name: dns-bench
               image: ghcr.io/james-gonzalez/dns-benchmark:latest

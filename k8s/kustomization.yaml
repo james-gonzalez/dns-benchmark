@@ -9,6 +9,10 @@ resources:
   - pvc.yaml
   - cronjob.yaml
   - nginx.yaml
+  - referencegrant.yaml
+  # httproute.yaml is applied separately (kubectl apply -f k8s/httproute.yaml)
+  # because kustomize's namespace override would move it out of 'default',
+  # breaking the reference to shared-gateway.
 
 # ── Image override ─────────────────────────────────────────────────────────────
 # Automatically kept up to date by the release pipeline.
