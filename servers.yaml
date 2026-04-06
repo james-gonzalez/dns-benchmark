@@ -5,6 +5,7 @@ servers:
   - 9.9.9.9                         # Quad9
   - 192.168.86.80                   # Local
   - 192.168.86.90                   # Local
+  - 192.168.86.34                   # Local K3s
   - 208.67.222.222                  # OpenDNS
   - 76.76.2.0                       # ControlD (Unfiltered)
   - 84.200.69.80                    # DNS.WATCH

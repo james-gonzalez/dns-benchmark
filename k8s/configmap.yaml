@@ -10,6 +10,7 @@ data:
       # Local DNS servers
       - 192.168.86.80
       - 192.168.86.90
+      - 192.168.86.34
 
       # UK-based providers
       - https://dns.aa.net.uk/dns-query
