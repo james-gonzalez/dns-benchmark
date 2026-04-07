@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DNS Benchmark Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f0f2f5; color: #1a1a2e; }
+    header { background: #16213e; color: #e2e8f0; padding: 1.5rem 2rem; }
+    header h1 { margin: 0; font-size: 1.6rem; }
+    header p  { margin: 0.25rem 0 0; font-size: 0.9rem; color: #94a3b8; }
+    main { max-width: 1100px; margin: 2rem auto; padding: 0 1.5rem; }
+    .card { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 1.5rem; margin-bottom: 2rem; }
+    h2 { margin-top: 0; font-size: 1.1rem; color: #16213e; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th { background: #16213e; color: white; padding: 10px 14px; text-align: left; }
+    td { padding: 9px 14px; border-bottom: 1px solid #f0f2f5; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+    a { color: #3b82f6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .chart-wrap { position: relative; height: 360px; }
+    .updated { font-size: 0.8rem; color: #94a3b8; text-align: right; margin-top: -1rem; margin-bottom: 1rem; }
+    .section-subtitle { color: #64748b; font-size: 0.9rem; margin-top: -0.4rem; margin-bottom: 1rem; }
+    .month-group { border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 0.75rem; overflow: hidden; }
+    .month-group > summary { cursor: pointer; list-style: none; padding: 0.85rem 1rem; font-weight: 600; background: #f8fafc; color: #1e293b; }
+    .month-group > summary::-webkit-details-marker { display: none; }
+    .month-group > summary::before { content: "▶"; display: inline-block; margin-right: 0.5rem; color: #64748b; transition: transform 0.2s ease; }
+    .month-group[open] > summary::before { transform: rotate(90deg); }
+    .loading { color: #94a3b8; font-style: italic; padding: 1rem 0; }
+    .error-msg { color: #ef4444; padding: 1rem 0; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>DNS Benchmark Dashboard</h1>
+  <p>Generated {{.GeneratedAt}}</p>
+</header>
+<main>
+
+  <div class="card">
+    <h2>Public DNS — Average Latency Over Time</h2>
+    <div class="chart-wrap"><canvas id="publicChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>Private / Local DNS — Average Latency Over Time</h2>
+    <div class="chart-wrap"><canvas id="privateChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>Public DNS Rankings</h2>
+    <p class="updated">All-time averages from history.csv</p>
+    <table>
+      <thead><tr><th>#</th><th>Server</th><th>Avg Latency (ms)</th></tr></thead>
+      <tbody>
+        {{range $i, $s := .PublicStats}}
+        <tr><td>{{add $i 1}}</td><td><code>{{$s.Server}}</code></td><td>{{printf "%.3f" $s.Avg}}</td></tr>
+        {{else}}
+        <tr><td colspan="3">No data yet.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Private / Local DNS Rankings</h2>
+    <p class="updated">All-time averages from history.csv</p>
+    <table>
+      <thead><tr><th>#</th><th>Server</th><th>Avg Latency (ms)</th></tr></thead>
+      <tbody>
+        {{range $i, $s := .PrivateStats}}
+        <tr><td>{{add $i 1}}</td><td><code>{{$s.Server}}</code></td><td>{{printf "%.3f" $s.Avg}}</td></tr>
+        {{else}}
+        <tr><td colspan="3">No data yet.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Individual Run Reports</h2>
+    <p class="section-subtitle">Latest 10 runs shown. Older runs are grouped by month.</p>
+    <table>
+      <thead><tr><th>Timestamp (UTC)</th><th>Report</th><th>Raw Data</th></tr></thead>
+      <tbody>
+        {{range .RecentRuns}}
+        <tr>
+          <td>{{.Timestamp}}</td>
+          <td><a href="{{.ReportFile}}">View Report</a></td>
+          <td><a href="{{.CSVFile}}">Download CSV</a></td>
+        </tr>
+        {{else}}
+        <tr><td colspan="3">No run reports yet.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{range .ArchivedMonths}}
+    <details class="month-group">
+      <summary>{{.Label}} ({{len .Runs}} runs)</summary>
+      <table>
+        <thead><tr><th>Timestamp (UTC)</th><th>Report</th><th>Raw Data</th></tr></thead>
+        <tbody>
+          {{range .Runs}}
+          <tr>
+            <td>{{.Timestamp}}</td>
+            <td><a href="{{.ReportFile}}">View Report</a></td>
+            <td><a href="{{.CSVFile}}">Download CSV</a></td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </details>
+    {{end}}
+  </div>
+
+</main>
+
+<script>
+// Fetch history.csv at runtime — no inline embedding, no size growth
+const palette = [
+  '#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6',
+  '#06b6d4','#f97316','#84cc16','#ec4899','#6366f1',
+  '#14b8a6','#a855f7','#fb923c','#22c55e','#e11d48'
+];
+
+function isPrivate(server) {
+  const plain = server.replace(/^(tls:\/\/|https?:\/\/)/, '').split('/')[0].split(':')[0];
+  if (/^192\.168\./.test(plain)) return true;
+  if (/^10\./.test(plain)) return true;
+  if (/^127\./.test(plain)) return true;
+  if (plain === 'localhost') return true;
+  const m = plain.match(/^172\.(\d+)\./);
+  if (m) { const n = parseInt(m[1]); return n >= 16 && n <= 31; }
+  return false;
+}
+
+function buildDatasets(serverList, byServerByTime, timestamps) {
+  return serverList.map((server, i) => ({
+    label: server,
+    data: timestamps.map(ts => {
+      const d = byServerByTime[server] && byServerByTime[server][ts];
+      return d ? +(d.sum / d.count).toFixed(3) : null;
+    }),
+    borderColor: palette[i % palette.length],
+    backgroundColor: palette[i % palette.length] + '22',
+    tension: 0.3,
+    spanGaps: true,
+    pointRadius: 3,
+  }));
+}
+
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: { mode: 'index', intersect: false },
+  plugins: {
+    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+    tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y} ms` } }
+  },
+  scales: {
+    x: { ticks: { maxTicksLimit: 10, maxRotation: 30 } },
+    y: { title: { display: true, text: 'Avg Latency (ms)' }, beginAtZero: true }
+  }
+};
+
+fetch('history.csv')
+  .then(r => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.text();
+  })
+  .then(csvText => {
+    const byServerByTime = {};
+    const allTimestamps = new Set();
+
+    csvText.trim().split('\n').slice(1).filter(Boolean).forEach(row => {
+      const [ts, server, , durStr, err] = row.split(',');
+      if (err && err.trim()) return;
+      const dur = parseFloat(durStr);
+      if (!dur || dur <= 0) return;
+      allTimestamps.add(ts);
+      if (!byServerByTime[server]) byServerByTime[server] = {};
+      if (!byServerByTime[server][ts]) byServerByTime[server][ts] = { sum: 0, count: 0 };
+      byServerByTime[server][ts].sum += dur;
+      byServerByTime[server][ts].count++;
+    });
+
+    const timestamps = [...allTimestamps].sort();
+    const servers = Object.keys(byServerByTime).sort();
+    const publicServers  = servers.filter(s => !isPrivate(s));
+    const privateServers = servers.filter(s =>  isPrivate(s));
+
+    new Chart(document.getElementById('publicChart'), {
+      type: 'line',
+      data: { labels: timestamps, datasets: buildDatasets(publicServers, byServerByTime, timestamps) },
+      options: chartOptions,
+    });
+
+    new Chart(document.getElementById('privateChart'), {
+      type: 'line',
+      data: { labels: timestamps, datasets: buildDatasets(privateServers, byServerByTime, timestamps) },
+      options: chartOptions,
+    });
+  })
+  .catch(err => {
+    ['publicChart', 'privateChart'].forEach(id => {
+      const canvas = document.getElementById(id);
+      if (canvas) {
+        const p = document.createElement('p');
+        p.className = 'error-msg';
+        p.textContent = `Could not load history.csv: ${err.message}`;
+        canvas.replaceWith(p);
+      }
+    });
+  });
+</script>
+</body>
+</html>

@@ -39,6 +39,9 @@ results.csv
 *.html
 *.csv
 
+# Exception: embedded template source files
+!dashboard/template.html
+
 # Editor/IDE
 # .idea/
 # .vscode/
