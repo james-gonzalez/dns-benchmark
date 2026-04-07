@@ -16,6 +16,7 @@ import (
 
 	"dns-bench/benchmark"
 	"dns-bench/browser"
+	"dns-bench/dashboard"
 	"dns-bench/validation"
 
 	"gopkg.in/yaml.v3"
@@ -204,6 +205,7 @@ func main() {
 		browserName  string
 		verbose      bool
 		showProgress bool
+		dashboardDir string
 	)
 
 	flag.StringVar(&configFile, "config", "", "Path to config file (YAML)")
@@ -218,7 +220,18 @@ func main() {
 	flag.StringVar(&browserName, "browser", "", "Import domains from browser history (chrome, brave, edge, firefox, safari, opera [Windows only])")
 	flag.BoolVar(&verbose, "v", false, "Verbose logging (show errors and slow queries)")
 	flag.BoolVar(&showProgress, "progress", false, "Show progress bar during benchmark")
+	flag.StringVar(&dashboardDir, "dashboard", "", "Generate index.html dashboard from history.csv in this directory (skips benchmark)")
 	flag.Parse()
+
+	// Dashboard-only mode: generate index.html and exit.
+	if dashboardDir != "" {
+		if err := dashboard.Generate(dashboardDir); err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating dashboard: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Dashboard generated at %s/index.html\n", dashboardDir)
+		return
+	}
 
 	// Load config file if specified or found
 	var cfg *Config

@@ -57,6 +57,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build Linux binaries for Docker
+        if: steps.semantic.outputs.new_release_published == 'true'
+        run: |
+          VERSION=${{ steps.semantic.outputs.new_release_version }}
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.Version=${VERSION}" -o dns-bench-linux-amd64 .
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.Version=${VERSION}" -o dns-bench-linux-arm64 .
+
       - name: Set up QEMU
         if: steps.semantic.outputs.new_release_published == 'true'
         uses: docker/setup-qemu-action@v3

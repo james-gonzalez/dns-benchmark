@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	// Import sqlite3 driver for database/sql
-	_ "github.com/mattn/go-sqlite3"
+	// Import sqlite driver for database/sql (pure Go, no CGO required)
+	_ "modernc.org/sqlite"
 )
 
 // browserConfig holds the resolved path and query for a browser
@@ -51,7 +51,7 @@ func GetDomains(browserName string, limit int) ([]string, error) {
 		return nil, fmt.Errorf("failed to copy history file (browser might be open?): %v", err)
 	}
 
-	db, err := sql.Open("sqlite3", tempPath)
+	db, err := sql.Open("sqlite", tempPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %v", err)
 	}
