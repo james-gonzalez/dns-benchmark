@@ -57,12 +57,46 @@ echo "${SUMMARY}" | while IFS=' ' read -r avg server; do
 done
 
 # ── Build HTML rows for the reports list ─────────────────────────────────────
-REPORT_ROWS=""
+RECENT_ROWS=""
+ARCHIVE_BLOCKS=""
+CURRENT_MONTH=""
+RUN_INDEX=0
+
 for f in $(ls -t "${RESULTS_DIR}"/report-*.html 2>/dev/null); do
   fname=$(basename "$f")
   ts=$(echo "$fname" | sed 's/report-//;s/\.html//')
-  REPORT_ROWS="${REPORT_ROWS}<tr><td>${ts}</td><td><a href=\"${fname}\">View Report</a></td><td><a href=\"results-${ts}.csv\">Download CSV</a></td></tr>"
+  row="<tr><td>${ts}</td><td><a href=\"${fname}\">View Report</a></td><td><a href=\"results-${ts}.csv\">Download CSV</a></td></tr>"
+
+  if [ "${RUN_INDEX}" -lt 10 ]; then
+    RECENT_ROWS="${RECENT_ROWS}${row}"
+  else
+    month=$(printf "%s" "${ts}" | cut -c1-7)
+    if [ "${month}" != "${CURRENT_MONTH}" ]; then
+      if [ -n "${CURRENT_MONTH}" ]; then
+        ARCHIVE_BLOCKS="${ARCHIVE_BLOCKS}</tbody></table></details>"
+      fi
+
+      ARCHIVE_BLOCKS="${ARCHIVE_BLOCKS}<details class=\"month-group\"><summary>${month}</summary><table><thead><tr><th>Timestamp (UTC)</th><th>Report</th><th>Raw Data</th></tr></thead><tbody>"
+      CURRENT_MONTH="${month}"
+    fi
+
+    ARCHIVE_BLOCKS="${ARCHIVE_BLOCKS}${row}"
+  fi
+
+  RUN_INDEX=$((RUN_INDEX + 1))
 done
+
+if [ -n "${CURRENT_MONTH}" ]; then
+  ARCHIVE_BLOCKS="${ARCHIVE_BLOCKS}</tbody></table></details>"
+fi
+
+if [ -z "${RECENT_ROWS}" ]; then
+  RECENT_ROWS="<tr><td colspan=\"3\">No run reports yet.</td></tr>"
+fi
+
+if [ -z "${ARCHIVE_BLOCKS}" ]; then
+  ARCHIVE_BLOCKS="<p class=\"updated\">No archived runs yet.</p>"
+fi
 
 # ── Write index.html ──────────────────────────────────────────────────────────
 cat > "${RESULTS_DIR}/index.html" <<HTML
@@ -91,6 +125,12 @@ cat > "${RESULTS_DIR}/index.html" <<HTML
     a:hover { text-decoration: underline; }
     .chart-wrap { position: relative; height: 340px; }
     .updated { font-size: 0.8rem; color: #94a3b8; text-align: right; margin-top: -1rem; margin-bottom: 1rem; }
+    .section-subtitle { color: #64748b; font-size: 0.9rem; margin-top: -0.4rem; margin-bottom: 1rem; }
+    .month-group { border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 0.75rem; overflow: hidden; }
+    .month-group > summary { cursor: pointer; list-style: none; padding: 0.85rem 1rem; font-weight: 600; background: #f8fafc; color: #1e293b; }
+    .month-group > summary::-webkit-details-marker { display: none; }
+    .month-group > summary::before { content: "▶"; display: inline-block; margin-right: 0.5rem; color: #64748b; transition: transform 0.2s ease; }
+    .month-group[open] > summary::before { transform: rotate(90deg); }
   </style>
 </head>
 <body>
@@ -116,12 +156,14 @@ cat > "${RESULTS_DIR}/index.html" <<HTML
 
   <div class="card">
     <h2>Individual Run Reports</h2>
+    <p class="section-subtitle">Latest 10 runs shown first. Older runs are grouped by month.</p>
     <table>
       <thead><tr><th>Timestamp (UTC)</th><th>Report</th><th>Raw Data</th></tr></thead>
       <tbody>
-        ${REPORT_ROWS}
+        ${RECENT_ROWS}
       </tbody>
     </table>
+    ${ARCHIVE_BLOCKS}
   </div>
 
 </main>
