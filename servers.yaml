@@ -1,28 +1,60 @@
 servers:
+  # --- Local ---
+  - 192.168.86.80                   # Technitium Primary
+  - 192.168.86.90                   # Pi-hole
+  - 192.168.86.34                   # Technitium Secondary (K3s)
+
   # --- Standard UDP ---
   - 1.1.1.1                         # Cloudflare
+  - 1.0.0.1                         # Cloudflare Secondary
   - 8.8.8.8                         # Google
+  - 8.8.4.4                         # Google Secondary
   - 9.9.9.9                         # Quad9
-  - 192.168.86.80                   # Local
-  - 192.168.86.90                   # Local
-  - 192.168.86.34                   # Local K3s
+  - 149.112.112.112                 # Quad9 Secondary
   - 208.67.222.222                  # OpenDNS
-  - 76.76.2.0                       # ControlD (Unfiltered)
+  - 208.67.220.220                  # OpenDNS Secondary
+  - 94.140.14.14                    # AdGuard Default
+  - 94.140.15.15                    # AdGuard Secondary
+  - 76.76.2.0                       # ControlD Unfiltered
   - 84.200.69.80                    # DNS.WATCH
-  - 94.140.14.14                    # AdGuard (Default)
+  - 185.222.222.222                 # dns.sb
+  - 45.11.45.11                     # dns.sb Secondary
 
   # --- DoT (DNS over TLS) ---
   - tls://1.1.1.1                   # Cloudflare DoT
   - tls://dns.google                # Google DoT
   - tls://dns.quad9.net             # Quad9 DoT
-  - tls://p0.freedns.controld.com   # ControlD DoT
   - tls://dns.adguard-dns.com       # AdGuard DoT
   - tls://dns.mullvad.net           # Mullvad DoT
+  - tls://p0.freedns.controld.com   # ControlD DoT
 
-  # --- DoH (DNS over HTTPS) ---
-  - https://cloudflare-dns.com/dns-query   # Cloudflare DoH
-  - https://dns.google/dns-query           # Google DoH
-  - https://dns.quad9.net/dns-query        # Quad9 DoH
-  - https://freedns.controld.com/p0        # ControlD DoH
-  - https://dns.adguard-dns.com/dns-query  # AdGuard DoH
-  - https://dns.mullvad.net/dns-query      # Mullvad DoH
+  # --- DoH (DNS over HTTPS) - Major Global ---
+  - https://cloudflare-dns.com/dns-query        # Cloudflare DoH
+  - https://dns.google/dns-query                # Google DoH
+  - https://dns.quad9.net/dns-query             # Quad9 DoH
+  - https://dns.adguard-dns.com/dns-query       # AdGuard DoH
+
+  # --- DoH - Privacy-Focused ---
+  - https://dns.mullvad.net/dns-query           # Mullvad (Sweden, No-logs)
+  - https://dns.njal.la/dns-query               # Njalla (Sweden, Privacy)
+  - https://dns.aa.net.uk/dns-query             # Andrews & Arnold (UK, No-logs)
+  - https://doh.appliedprivacy.net/dns-query    # Applied Privacy (Austria)
+  - https://anycast.uncensoreddns.org/dns-query # Uncensored DNS (Denmark)
+  - https://wikimedia-dns.org/dns-query         # Wikimedia DNS
+
+  # --- DoH - European Regional ---
+  - https://doh.ffmuc.net/dns-query             # FFMUC (Munich, Germany)
+  - https://doh.bortzmeyer.fr/                  # Bortzmeyer (France)
+  - https://dns.brahma.world/dns-query          # Brahma World (Germany)
+  - https://dnsforge.de/dns-query               # DNS Forge (Germany)
+  - https://dns.circl.lu/dns-query              # CIRCL (Luxembourg)
+  - https://unfiltered.joindns4.eu/dns-query    # DNS4EU Unfiltered (EU)
+
+  # --- DoH - Ad/Malware Blocking ---
+  - https://doh-de.blahdns.com/dns-query        # BlahDNS (Germany)
+  - https://doh-sg.blahdns.com/dns-query        # BlahDNS (Singapore)
+  - https://freedns.controld.com/p0             # ControlD DoH
+  - https://adblock.dns.mullvad.net/dns-query   # Mullvad Ad-blocking
+
+  # --- DoH - Asia/Pacific ---
+  - https://doh.tiarap.org/dns-query            # Tiar.app (Japan)

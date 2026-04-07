@@ -141,16 +141,30 @@ cat > "${RESULTS_DIR}/index.html" <<HTML
 <main>
 
   <div class="card">
-    <h2>All-time Average Latency (lower is better)</h2>
-    <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+    <h2>Public DNS — Average Latency Over Time</h2>
+    <div class="chart-wrap"><canvas id="publicChart"></canvas></div>
   </div>
 
   <div class="card">
-    <h2>Overall Server Rankings</h2>
+    <h2>Private / Local DNS — Average Latency Over Time</h2>
+    <div class="chart-wrap"><canvas id="privateChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>Public DNS Rankings</h2>
     <p class="updated">Averaged across all runs</p>
     <table>
       <thead><tr><th>#</th><th>Server</th><th>Avg Latency (ms)</th></tr></thead>
-      <tbody id="summaryBody"></tbody>
+      <tbody id="publicSummaryBody"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Private / Local DNS Rankings</h2>
+    <p class="updated">Averaged across all runs</p>
+    <table>
+      <thead><tr><th>#</th><th>Server</th><th>Avg Latency (ms)</th></tr></thead>
+      <tbody id="privateSummaryBody"></tbody>
     </table>
   </div>
 
@@ -191,6 +205,18 @@ rows.forEach(row => {
 const timestamps = [...allTimestamps].sort();
 const servers = Object.keys(byServerByTime).sort();
 
+// Classify servers as private (local) or public
+function isPrivate(server) {
+  return /^192\.168\./.test(server) ||
+         /^10\./.test(server) ||
+         /^172\.(1[6-9]|2\d|3[01])\./.test(server) ||
+         /^127\./.test(server) ||
+         server === 'localhost';
+}
+
+const privateServers = servers.filter(isPrivate);
+const publicServers  = servers.filter(s => !isPrivate(s));
+
 // Colour palette
 const palette = [
   '#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6',
@@ -198,51 +224,65 @@ const palette = [
   '#14b8a6','#a855f7','#fb923c','#22c55e','#e11d48'
 ];
 
-// Build chart datasets
-const datasets = servers.map((server, i) => ({
-  label: server,
-  data: timestamps.map(ts => {
-    const d = byServerByTime[server][ts];
-    return d ? +(d.sum / d.count).toFixed(3) : null;
-  }),
-  borderColor: palette[i % palette.length],
-  backgroundColor: palette[i % palette.length] + '22',
-  tension: 0.3,
-  spanGaps: true,
-  pointRadius: 3,
-}));
-
-new Chart(document.getElementById('trendChart'), {
-  type: 'line',
-  data: { labels: timestamps, datasets },
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { mode: 'index', intersect: false },
-    plugins: {
-      legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
-      tooltip: { callbacks: { label: ctx => \` \${ctx.dataset.label}: \${ctx.parsed.y} ms\` } }
-    },
-    scales: {
-      x: { ticks: { maxTicksLimit: 10, maxRotation: 30 } },
-      y: { title: { display: true, text: 'Avg Latency (ms)' }, beginAtZero: true }
-    }
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: { mode: 'index', intersect: false },
+  plugins: {
+    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+    tooltip: { callbacks: { label: ctx => \` \${ctx.dataset.label}: \${ctx.parsed.y} ms\` } }
+  },
+  scales: {
+    x: { ticks: { maxTicksLimit: 10, maxRotation: 30 } },
+    y: { title: { display: true, text: 'Avg Latency (ms)' }, beginAtZero: true }
   }
+};
+
+function buildDatasets(serverList) {
+  return serverList.map((server, i) => ({
+    label: server,
+    data: timestamps.map(ts => {
+      const d = byServerByTime[server][ts];
+      return d ? +(d.sum / d.count).toFixed(3) : null;
+    }),
+    borderColor: palette[i % palette.length],
+    backgroundColor: palette[i % palette.length] + '22',
+    tension: 0.3,
+    spanGaps: true,
+    pointRadius: 3,
+  }));
+}
+
+new Chart(document.getElementById('publicChart'), {
+  type: 'line',
+  data: { labels: timestamps, datasets: buildDatasets(publicServers) },
+  options: chartOptions,
 });
 
-// Populate summary table from all-time averages
-const allTimeAvg = servers.map(server => {
-  let sum = 0, count = 0;
-  Object.values(byServerByTime[server]).forEach(d => { sum += d.sum; count += d.count; });
-  return { server, avg: count ? +(sum / count).toFixed(3) : Infinity };
-}).sort((a, b) => a.avg - b.avg);
-
-const tbody = document.getElementById('summaryBody');
-allTimeAvg.forEach((row, i) => {
-  const tr = document.createElement('tr');
-  tr.innerHTML = \`<td>\${i+1}</td><td><code>\${row.server}</code></td><td>\${row.avg} ms</td>\`;
-  tbody.appendChild(tr);
+new Chart(document.getElementById('privateChart'), {
+  type: 'line',
+  data: { labels: timestamps, datasets: buildDatasets(privateServers) },
+  options: chartOptions,
 });
+
+// Populate summary tables from all-time averages
+function populateTable(serverList, tbodyId) {
+  const avg = serverList.map(server => {
+    let sum = 0, count = 0;
+    Object.values(byServerByTime[server]).forEach(d => { sum += d.sum; count += d.count; });
+    return { server, avg: count ? +(sum / count).toFixed(3) : Infinity };
+  }).sort((a, b) => a.avg - b.avg);
+
+  const tbody = document.getElementById(tbodyId);
+  avg.forEach((row, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = \`<td>\${i+1}</td><td><code>\${row.server}</code></td><td>\${row.avg} ms</td>\`;
+    tbody.appendChild(tr);
+  });
+}
+
+populateTable(publicServers,  'publicSummaryBody');
+populateTable(privateServers, 'privateSummaryBody');
 </script>
 </body>
 </html>
