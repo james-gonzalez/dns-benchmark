@@ -61,7 +61,7 @@ func AggregateResults(hostResults map[string][]benchmark.Result) []AggregatedRes
 	}
 
 	// Calculate statistics
-	var aggregated []AggregatedResult
+	aggregated := make([]AggregatedResult, 0, len(grouped))
 	for key, values := range grouped {
 		parts := strings.Split(key, "|")
 		if len(parts) != 2 {
@@ -144,26 +144,26 @@ func calculateMin(values []float64) float64 {
 	if len(values) == 0 {
 		return 0
 	}
-	min := values[0]
+	minVal := values[0]
 	for _, v := range values {
-		if v < min {
-			min = v
+		if v < minVal {
+			minVal = v
 		}
 	}
-	return min
+	return minVal
 }
 
 func calculateMax(values []float64) float64 {
 	if len(values) == 0 {
 		return 0
 	}
-	max := values[0]
+	maxVal := values[0]
 	for _, v := range values {
-		if v > max {
-			max = v
+		if v > maxVal {
+			maxVal = v
 		}
 	}
-	return max
+	return maxVal
 }
 
 func calculateStdDev(values []float64, mean float64) float64 {
