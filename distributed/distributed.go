@@ -14,10 +14,10 @@ import (
 
 // HostConfig represents a remote host to run benchmarks on
 type HostConfig struct {
-	Name     string // e.g., "rpi-1", "rpi-2"
-	Host     string // hostname or IP
-	Port     int    // SSH port (default 22)
-	User     string // SSH user
+	Name       string // e.g., "rpi-1", "rpi-2"
+	Host       string // hostname or IP
+	Port       int    // SSH port (default 22)
+	User       string // SSH user
 	BinaryPath string // path to dns-bench binary on remote
 }
 
@@ -34,7 +34,7 @@ type AggregatedResult struct {
 }
 
 // RunDistributed executes benchmarks on multiple hosts and aggregates results
-func RunDistributed(hosts []HostConfig, config benchmark.BenchmarkConfig) ([]AggregatedResult, error) {
+func RunDistributed(hosts []HostConfig, config benchmark.Config) ([]AggregatedResult, error) {
 	// For now, this is a placeholder that shows the structure
 	// In a real implementation, this would:
 	// 1. SSH into each host
@@ -53,9 +53,9 @@ func AggregateResults(hostResults map[string][]benchmark.Result) []AggregatedRes
 
 	for _, results := range hostResults {
 		for _, r := range results {
-			if r.Error == "" {
+			if r.Error == nil {
 				key := r.Server + "|" + r.Domain
-				grouped[key] = append(grouped[key], float64(r.DurationMs))
+				grouped[key] = append(grouped[key], float64(r.Duration.Milliseconds()))
 			}
 		}
 	}

@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"dns-bench/api"
 	"dns-bench/dashboard"
