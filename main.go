@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/csv"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"html/template"
@@ -17,6 +18,7 @@ import (
 	"dns-bench/benchmark"
 	"dns-bench/browser"
 	"dns-bench/dashboard"
+	"dns-bench/distributed"
 	"dns-bench/validation"
 
 	"gopkg.in/yaml.v3"
@@ -151,6 +153,19 @@ type Config struct {
 	BrowserName string        `yaml:"browser"`
 }
 
+// HostsFile represents the YAML structure for distributed hosts
+type HostsFile struct {
+	Hosts []distributed.HostConfig `yaml:"hosts"`
+}
+
+// jsonResult represents JSON output for -json flag
+type jsonResult struct {
+	Server     string `json:"server"`
+	Domain     string `json:"domain"`
+	DurationMs int64  `json:"duration_ms"`
+	Error      string `json:"error"`
+}
+
 // loadConfigFile loads configuration from a YAML file
 func loadConfigFile(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
@@ -193,19 +208,21 @@ func findConfigFile() string {
 //nolint:gocyclo // main() handles CLI flag parsing and orchestration; complexity is acceptable
 func main() {
 	var (
-		configFile   string
-		concurrency  int
-		iterations   int
-		timeout      time.Duration
-		duration     time.Duration
-		domainFile   string
-		serverFile   string
-		exportFile   string
-		htmlFile     string
-		browserName  string
-		verbose      bool
-		showProgress bool
-		dashboardDir string
+		configFile      string
+		concurrency     int
+		iterations      int
+		timeout         time.Duration
+		duration        time.Duration
+		domainFile      string
+		serverFile      string
+		exportFile      string
+		htmlFile        string
+		browserName     string
+		verbose         bool
+		showProgress    bool
+		dashboardDir    string
+		jsonOutput      bool
+		distributedFile string
 	)
 
 	flag.StringVar(&configFile, "config", "", "Path to config file (YAML)")
@@ -221,6 +238,8 @@ func main() {
 	flag.BoolVar(&verbose, "v", false, "Verbose logging (show errors and slow queries)")
 	flag.BoolVar(&showProgress, "progress", false, "Show progress bar during benchmark")
 	flag.StringVar(&dashboardDir, "dashboard", "", "Generate index.html dashboard from history.csv in this directory (skips benchmark)")
+	flag.BoolVar(&jsonOutput, "json", false, "Output results as JSON to stdout (for distributed mode)")
+	flag.StringVar(&distributedFile, "distributed", "", "Path to hosts.yaml for distributed multi-host testing")
 	flag.Parse()
 
 	// Dashboard-only mode: generate index.html and exit.
@@ -250,11 +269,13 @@ func main() {
 			fmt.Printf("Error loading config file: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Loaded config from %s\n", configFile)
+		if !jsonOutput {
+			fmt.Printf("Loaded config from %s\n", configFile)
+		}
 	} else if found := findConfigFile(); found != "" {
 		var err error
 		cfg, err = loadConfigFile(found)
-		if err == nil {
+		if err == nil && !jsonOutput {
 			fmt.Printf("Loaded config from %s\n", found)
 		}
 	}
@@ -353,7 +374,9 @@ func main() {
 			os.Exit(1)
 		}
 	} else if cfg.BrowserName != "" {
-		fmt.Printf("Extracting domains from %s history...\n", cfg.BrowserName)
+		if !jsonOutput {
+			fmt.Printf("Extracting domains from %s history...\n", cfg.BrowserName)
+		}
 		var err error
 		domains, err = browser.GetDomains(cfg.BrowserName, 1000) // Limit to 1000 most recent/frequent
 		if err != nil {
@@ -368,7 +391,9 @@ func main() {
 			fmt.Printf("Error extracting browser history: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Found %d unique domains from %s\n", len(domains), cfg.BrowserName)
+		if !jsonOutput {
+			fmt.Printf("Found %d unique domains from %s\n", len(domains), cfg.BrowserName)
+		}
 	}
 
 	// Validate domains
@@ -385,11 +410,74 @@ func main() {
 	}
 	domains = validDomains
 
-	fmt.Printf("Starting benchmark...\n")
-	if cfg.Duration > 0 {
-		fmt.Printf("Servers: %d, Domains: %d, Duration: %v, Concurrency: %d\n", len(servers), len(domains), cfg.Duration, cfg.Concurrency)
-	} else {
-		fmt.Printf("Servers: %d, Domains: %d, Iterations: %d, Concurrency: %d\n", len(servers), len(domains), cfg.Iterations, cfg.Concurrency)
+	// Distributed mode: run benchmarks on remote hosts
+	if distributedFile != "" {
+		// Load hosts.yaml
+		hostsData, err := os.ReadFile(distributedFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading hosts file: %v\n", err)
+			os.Exit(1)
+		}
+
+		var hostsFile HostsFile
+		if err := yaml.Unmarshal(hostsData, &hostsFile); err != nil {
+			fmt.Fprintf(os.Stderr, "Error parsing hosts file: %v\n", err)
+			os.Exit(1)
+		}
+
+		if len(hostsFile.Hosts) == 0 {
+			fmt.Fprintf(os.Stderr, "Error: no hosts defined in %s\n", distributedFile)
+			os.Exit(1)
+		}
+
+		// Build benchmark config
+		config := benchmark.Config{
+			Servers:      servers,
+			Domains:      domains,
+			Iterations:   cfg.Iterations,
+			Concurrency:  cfg.Concurrency,
+			Timeout:      cfg.Timeout,
+			Duration:     cfg.Duration,
+			Verbose:      cfg.Verbose,
+			ShowProgress: cfg.Progress,
+		}
+
+		fmt.Printf("Running distributed benchmark on %d hosts...\n", len(hostsFile.Hosts))
+		results, err := distributed.RunDistributed(hostsFile.Hosts, config)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error running distributed benchmark: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Print aggregated results table
+		fmt.Printf("\nDistributed Benchmark Results (%d hosts)\n\n", len(hostsFile.Hosts))
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+		fmt.Fprintln(w, "SERVER\tDOMAIN\tAVG (ms)\tMIN (ms)\tMAX (ms)\tSTDDEV (ms)")
+		for _, r := range results {
+			fmt.Fprintf(w, "%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n",
+				r.Server, r.Domain, r.AverageMs, r.MinMs, r.MaxMs, r.StdDev)
+		}
+		w.Flush()
+
+		// Export to CSV if requested
+		if exportFile != "" {
+			if err := distributed.ExportAggregatedCSV(results, exportFile); err != nil {
+				fmt.Fprintf(os.Stderr, "Error exporting results: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("\nResults exported to %s\n", exportFile)
+		}
+
+		return
+	}
+
+	if !jsonOutput {
+		fmt.Printf("Starting benchmark...\n")
+		if cfg.Duration > 0 {
+			fmt.Printf("Servers: %d, Domains: %d, Duration: %v, Concurrency: %d\n", len(servers), len(domains), cfg.Duration, cfg.Concurrency)
+		} else {
+			fmt.Printf("Servers: %d, Domains: %d, Iterations: %d, Concurrency: %d\n", len(servers), len(domains), cfg.Iterations, cfg.Concurrency)
+		}
 	}
 
 	config := benchmark.Config{
@@ -406,6 +494,30 @@ func main() {
 	start := time.Now()
 	results := benchmark.Run(config)
 	totalTime := time.Since(start)
+
+	// JSON output mode: emit results as JSON and exit
+	if jsonOutput {
+		jsonResults := make([]jsonResult, len(results))
+		for i, r := range results {
+			errStr := ""
+			if r.Error != nil {
+				errStr = r.Error.Error()
+			}
+			jsonResults[i] = jsonResult{
+				Server:     r.Server,
+				Domain:     r.Domain,
+				DurationMs: r.Duration.Milliseconds(),
+				Error:      errStr,
+			}
+		}
+
+		encoder := json.NewEncoder(os.Stdout)
+		if err := encoder.Encode(jsonResults); err != nil {
+			fmt.Fprintf(os.Stderr, "Error encoding JSON: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	stats := calculateStats(results)
 	printTable(stats, totalTime)
