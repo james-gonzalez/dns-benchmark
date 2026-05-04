@@ -1,0 +1,15 @@
+[Unit]
+Description=DNS Benchmark Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/results
+ExecStart=/usr/local/bin/dns-bench -serve 8080
+Restart=always
+RestartSec=10s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
