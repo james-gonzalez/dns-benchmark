@@ -31,12 +31,28 @@
     .month-group[open] > summary::before { transform: rotate(90deg); }
     .loading { color: #94a3b8; font-style: italic; padding: 1rem 0; }
     .error-msg { color: #ef4444; padding: 1rem 0; }
+    .header-actions { display: flex; gap: 1rem; align-items: center; margin-top: 1rem; }
+    .btn { padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+    .btn-danger { background: #ef4444; color: white; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-danger:disabled { background: #a3a3a3; cursor: not-allowed; }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+    .modal.show { display: flex; align-items: center; justify-content: center; }
+    .modal-content { background-color: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 400px; text-align: center; }
+    .modal-content h2 { margin-top: 0; color: #ef4444; }
+    .modal-actions { display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; }
+    .btn-secondary { background: #6b7280; color: white; }
+    .btn-secondary:hover { background: #4b5563; }
+    .success-msg { color: #10b981; padding: 1rem 0; }
   </style>
 </head>
 <body>
 <header>
   <h1>DNS Benchmark Dashboard</h1>
   <p>Generated {{.GeneratedAt}}</p>
+  <div class="header-actions">
+    <button class="btn btn-danger" onclick="showClearModal()">🗑️ Clear All Results</button>
+  </div>
 </header>
 <main>
 
@@ -117,6 +133,68 @@
   </div>
 
 </main>
+
+<div id="clearModal" class="modal">
+  <div class="modal-content">
+    <h2>⚠️ Clear All Results?</h2>
+    <p>This will permanently delete all benchmark results, history, and reports. This action cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="hideClearModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmClear()">Yes, Delete All</button>
+    </div>
+    <div id="clearStatus"></div>
+  </div>
+</div>
+
+<script>
+function showClearModal() {
+  document.getElementById('clearModal').classList.add('show');
+}
+
+function hideClearModal() {
+  document.getElementById('clearModal').classList.remove('show');
+  document.getElementById('clearStatus').innerHTML = '';
+}
+
+async function confirmClear() {
+  const statusDiv = document.getElementById('clearStatus');
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Deleting...';
+
+  try {
+    const response = await fetch('/api/clear-results', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      statusDiv.innerHTML = `<p class="success-msg">✓ Successfully deleted ${data.deleted} files. Reloading...</p>`;
+      setTimeout(() => {
+        location.reload();
+      }, 1500);
+    } else {
+      statusDiv.innerHTML = `<p class="error-msg">Error: ${data.error}</p>`;
+      btn.disabled = false;
+      btn.textContent = 'Yes, Delete All';
+    }
+  } catch (err) {
+    statusDiv.innerHTML = `<p class="error-msg">Error: ${err.message}</p>`;
+    btn.disabled = false;
+    btn.textContent = 'Yes, Delete All';
+  }
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+  const modal = document.getElementById('clearModal');
+  if (event.target === modal) {
+    hideClearModal();
+  }
+});
+</script>
 
 <script>
 // Fetch history.csv at runtime — no inline embedding, no size growth
