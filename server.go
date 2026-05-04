@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"dns-bench/api"
 	"dns-bench/dashboard"
@@ -24,18 +25,27 @@ func serveDashboard(resultsDir string, port string) error {
 	}
 
 	// Serve static files from results directory
+	mux := http.NewServeMux()
 	fs := http.FileServer(http.Dir(resultsDir))
 
 	// API endpoints
-	http.HandleFunc("/api/clear-results", api.ClearResultsHandler(resultsDir))
-	http.HandleFunc("/api/health", api.HealthHandler)
+	mux.HandleFunc("/api/clear-results", api.ClearResultsHandler(resultsDir))
+	mux.HandleFunc("/api/health", api.HealthHandler)
 
 	// Serve static files (fallback)
-	http.Handle("/", fs)
+	mux.Handle("/", fs)
 
 	addr := ":" + port
 	log.Printf("Starting DNS Benchmark dashboard server on http://localhost%s", addr)
-	return http.ListenAndServe(addr, nil)
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	return server.ListenAndServe()
 }
 
 // Add this to main() function

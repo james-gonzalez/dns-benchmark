@@ -233,6 +233,14 @@ func main() {
 		return
 	}
 
+	if servePort != "" {
+		if err := serveDashboard(".", servePort); err != nil {
+			fmt.Fprintf(os.Stderr, "Error starting dashboard server: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	// Load config file if specified or found
 	var cfg *Config
 	if configFile != "" {

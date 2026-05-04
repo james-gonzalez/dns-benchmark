@@ -34,7 +34,7 @@ type AggregatedResult struct {
 }
 
 // RunDistributed executes benchmarks on multiple hosts and aggregates results
-func RunDistributed(hosts []HostConfig, config benchmark.Config) ([]AggregatedResult, error) {
+func RunDistributed(hosts []HostConfig, _ benchmark.Config) ([]AggregatedResult, error) {
 	// For now, this is a placeholder that shows the structure
 	// In a real implementation, this would:
 	// 1. SSH into each host
@@ -42,7 +42,7 @@ func RunDistributed(hosts []HostConfig, config benchmark.Config) ([]AggregatedRe
 	// 3. Collect results
 	// 4. Aggregate and average them
 
-	var results []AggregatedResult
+	results := make([]AggregatedResult, 0, len(hosts))
 	return results, fmt.Errorf("distributed testing not yet implemented")
 }
 
@@ -69,16 +69,16 @@ func AggregateResults(hostResults map[string][]benchmark.Result) []AggregatedRes
 		}
 
 		avg := calculateMean(values)
-		min := calculateMin(values)
-		max := calculateMax(values)
+		minMs := calculateMin(values)
+		maxMs := calculateMax(values)
 		stdDev := calculateStdDev(values, avg)
 
 		aggregated = append(aggregated, AggregatedResult{
 			Server:    parts[0],
 			Domain:    parts[1],
 			AverageMs: avg,
-			MinMs:     min,
-			MaxMs:     max,
+			MinMs:     minMs,
+			MaxMs:     maxMs,
 			StdDev:    stdDev,
 		})
 	}
@@ -106,11 +106,13 @@ func ExportAggregatedCSV(results []AggregatedResult, filename string) error {
 	defer w.Flush()
 
 	// Write header
-	w.Write([]string{"timestamp", "server", "domain", "avg_ms", "min_ms", "max_ms", "stddev_ms"})
+	if err := w.Write([]string{"timestamp", "server", "domain", "avg_ms", "min_ms", "max_ms", "stddev_ms"}); err != nil {
+		return err
+	}
 
 	timestamp := time.Now().Format(time.RFC3339)
 	for _, r := range results {
-		w.Write([]string{
+		if err := w.Write([]string{
 			timestamp,
 			r.Server,
 			r.Domain,
@@ -118,10 +120,12 @@ func ExportAggregatedCSV(results []AggregatedResult, filename string) error {
 			fmt.Sprintf("%.3f", r.MinMs),
 			fmt.Sprintf("%.3f", r.MaxMs),
 			fmt.Sprintf("%.3f", r.StdDev),
-		})
+		}); err != nil {
+			return err
+		}
 	}
 
-	return nil
+	return w.Error()
 }
 
 // Helper functions

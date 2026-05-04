@@ -77,14 +77,20 @@ func ClearResultsHandler(resultsDir string) http.HandlerFunc {
 }
 
 // HealthHandler returns the health status of the API
-func HealthHandler(w http.ResponseWriter, r *http.Request) {
+func HealthHandler(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{
 		"status": "ok",
 	})
 }
 
 func respondJSON(w http.ResponseWriter, statusCode int, data interface{}) {
+	payload, err := json.Marshal(data)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to encode response: %v", err), http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(data)
+	_, _ = w.Write(payload)
+	_, _ = w.Write([]byte("\n"))
 }
