@@ -270,7 +270,7 @@ func TestCollectRuns(t *testing.T) {
 		f.Close()
 	}
 
-	recent, archived, err = collectRuns(tmpDir)
+	recent, _, err = collectRuns(tmpDir)
 	if err != nil {
 		t.Fatalf("collectRuns failed: %v", err)
 	}
@@ -306,13 +306,13 @@ func TestGenerate(t *testing.T) {
 2026-05-01T10:00:02Z,192.168.1.1,example.com,15.0,,k3s-pod
 `
 	historyPath := filepath.Join(tmpDir, "history.csv")
-	if err := os.WriteFile(historyPath, []byte(historyData), 0644); err != nil {
+	if err := os.WriteFile(historyPath, []byte(historyData), 0o644); err != nil {
 		t.Fatalf("failed to write history.csv: %v", err)
 	}
 
 	// Create a report file
 	reportPath := filepath.Join(tmpDir, "report-2026-05-01T10:00:00Z.html")
-	if err := os.WriteFile(reportPath, []byte("<html></html>"), 0644); err != nil {
+	if err := os.WriteFile(reportPath, []byte("<html></html>"), 0o644); err != nil {
 		t.Fatalf("failed to write report: %v", err)
 	}
 
