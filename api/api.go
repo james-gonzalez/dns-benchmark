@@ -1,12 +1,162 @@
 package api
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
+	"time"
 )
+
+// SubmitRequest is the payload accepted by SubmitResultsHandler.
+type SubmitRequest struct {
+	Source  string       `json:"source"`
+	Results []JSONResult `json:"results"`
+}
+
+// JSONResult mirrors the -json output format of dns-bench.
+type JSONResult struct {
+	Server     string  `json:"server"`
+	Domain     string  `json:"domain"`
+	DurationMs float64 `json:"duration_ms"`
+	Error      string  `json:"error"`
+}
+
+// AuthMiddleware validates the X-API-Key header against the DNS_BENCH_API_KEY
+// environment variable. If the variable is unset, all requests are allowed.
+func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		secret := os.Getenv("DNS_BENCH_API_KEY")
+		if secret != "" && r.Header.Get("X-API-Key") != secret {
+			respondJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		next(w, r)
+	}
+}
+
+// SubmitResultsHandler accepts benchmark results pushed from remote devices and
+// appends them to history.csv, writes a per-submission results CSV, then
+// regenerates the dashboard.
+func SubmitResultsHandler(resultsDir string, mu *sync.Mutex, regenerate func(string) error) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req SubmitRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			respondJSON(w, http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("invalid JSON: %v", err)})
+			return
+		}
+
+		if req.Source == "" {
+			respondJSON(w, http.StatusBadRequest, map[string]string{"error": "source is required"})
+			return
+		}
+		if len(req.Results) == 0 {
+			respondJSON(w, http.StatusBadRequest, map[string]string{"error": "results must not be empty"})
+			return
+		}
+		if len(req.Results) > 10000 {
+			respondJSON(w, http.StatusBadRequest, map[string]string{"error": "results exceeds maximum of 10000"})
+			return
+		}
+
+		timestamp := time.Now().UTC()
+		tsStr := timestamp.Format(time.RFC3339)
+		fileTS := timestamp.Format("2006-01-02T15-04-05Z")
+
+		mu.Lock()
+		err := writeSubmission(resultsDir, req, tsStr, fileTS)
+		mu.Unlock()
+
+		if err != nil {
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+
+		// Regenerate dashboard outside the lock — it only reads files.
+		if regenerate != nil {
+			if err := regenerate(resultsDir); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to regenerate dashboard: %v\n", err)
+			}
+		}
+
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"accepted": len(req.Results),
+			"source":   req.Source,
+		})
+	}
+}
+
+// writeSubmission appends to history.csv and writes a per-submission results CSV.
+// Caller must hold the mutex.
+func writeSubmission(resultsDir string, req SubmitRequest, tsStr, fileTS string) error {
+	historyPath := filepath.Join(resultsDir, "history.csv")
+	historyExists := true
+	if _, err := os.Stat(historyPath); os.IsNotExist(err) {
+		historyExists = false
+	}
+
+	hf, err := os.OpenFile(historyPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return fmt.Errorf("failed to open history.csv: %w", err)
+	}
+	defer hf.Close()
+
+	hw := csv.NewWriter(hf)
+	if !historyExists {
+		if err := hw.Write([]string{"Timestamp", "Server", "Domain", "Duration_ms", "Error", "Source"}); err != nil {
+			return fmt.Errorf("failed to write history header: %w", err)
+		}
+	}
+	for _, res := range req.Results {
+		if err := hw.Write([]string{
+			tsStr,
+			res.Server,
+			res.Domain,
+			fmt.Sprintf("%.4f", res.DurationMs),
+			res.Error,
+			req.Source,
+		}); err != nil {
+			return fmt.Errorf("failed to write history row: %w", err)
+		}
+	}
+	hw.Flush()
+	if err := hw.Error(); err != nil {
+		return fmt.Errorf("failed to flush history.csv: %w", err)
+	}
+
+	// Per-submission results CSV: results-<timestamp>-<source>.csv
+	runPath := filepath.Join(resultsDir, fmt.Sprintf("results-%s-%s.csv", fileTS, req.Source))
+	rf, err := os.Create(runPath)
+	if err != nil {
+		return fmt.Errorf("failed to create run CSV: %w", err)
+	}
+	defer rf.Close()
+
+	rw := csv.NewWriter(rf)
+	if err := rw.Write([]string{"Server", "Domain", "Duration_ms", "Error"}); err != nil {
+		return fmt.Errorf("failed to write run CSV header: %w", err)
+	}
+	for _, res := range req.Results {
+		if err := rw.Write([]string{
+			res.Server,
+			res.Domain,
+			fmt.Sprintf("%.4f", res.DurationMs),
+			res.Error,
+		}); err != nil {
+			return fmt.Errorf("failed to write run CSV row: %w", err)
+		}
+	}
+	rw.Flush()
+	return rw.Error()
+}
 
 // ClearResultsHandler deletes all result files from the results directory
 func ClearResultsHandler(resultsDir string) http.HandlerFunc {

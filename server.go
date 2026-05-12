@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"dns-bench/api"
@@ -24,6 +25,9 @@ func serveDashboard(resultsDir string, port string) error {
 		log.Printf("Warning: failed to generate initial dashboard: %v", err)
 	}
 
+	// Shared mutex for all write handlers
+	var historyMu sync.Mutex
+
 	// Serve static files from results directory
 	mux := http.NewServeMux()
 	fs := http.FileServer(http.Dir(resultsDir))
@@ -31,6 +35,7 @@ func serveDashboard(resultsDir string, port string) error {
 	// API endpoints
 	mux.HandleFunc("/api/clear-results", api.ClearResultsHandler(resultsDir))
 	mux.HandleFunc("/api/health", api.HealthHandler)
+	mux.HandleFunc("/api/submit-results", api.AuthMiddleware(api.SubmitResultsHandler(resultsDir, &historyMu, dashboard.Generate)))
 
 	// Serve static files (fallback)
 	mux.Handle("/", fs)

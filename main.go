@@ -2,11 +2,13 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"html/template"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -166,6 +168,50 @@ type jsonResult struct {
 	Error      string `json:"error"`
 }
 
+// pushResults sends benchmark results to a remote server via HTTP POST.
+func pushResults(url string, results []jsonResult) error {
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "unknown"
+	}
+
+	payload := struct {
+		Source  string       `json:"source"`
+		Results []jsonResult `json:"results"`
+	}{
+		Source:  hostname,
+		Results: results,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to encode payload: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if apiKey := os.Getenv("DNS_BENCH_API_KEY"); apiKey != "" {
+		req.Header.Set("X-API-Key", apiKey)
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server returned %d", resp.StatusCode)
+	}
+
+	fmt.Printf("Pushed %d results to %s\n", len(results), url)
+	return nil
+}
+
 // loadConfigFile loads configuration from a YAML file
 func loadConfigFile(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
@@ -223,6 +269,7 @@ func main() {
 		dashboardDir    string
 		jsonOutput      bool
 		distributedFile string
+		pushURL         string
 	)
 
 	flag.StringVar(&configFile, "config", "", "Path to config file (YAML)")
@@ -240,6 +287,7 @@ func main() {
 	flag.StringVar(&dashboardDir, "dashboard", "", "Generate index.html dashboard from history.csv in this directory (skips benchmark)")
 	flag.BoolVar(&jsonOutput, "json", false, "Output results as JSON to stdout (for distributed mode)")
 	flag.StringVar(&distributedFile, "distributed", "", "Path to hosts.yaml for distributed multi-host testing")
+	flag.StringVar(&pushURL, "push", "", "URL to push JSON results to (e.g. https://dns-bench.home.local/api/submit-results)")
 	flag.Parse()
 
 	// Dashboard-only mode: generate index.html and exit.
@@ -496,7 +544,7 @@ func main() {
 	totalTime := time.Since(start)
 
 	// JSON output mode: emit results as JSON and exit
-	if jsonOutput {
+	if jsonOutput || pushURL != "" {
 		jsonResults := make([]jsonResult, len(results))
 		for i, r := range results {
 			errStr := ""
@@ -509,6 +557,14 @@ func main() {
 				DurationMs: r.Duration.Milliseconds(),
 				Error:      errStr,
 			}
+		}
+
+		if pushURL != "" {
+			if err := pushResults(pushURL, jsonResults); err != nil {
+				fmt.Fprintf(os.Stderr, "Error pushing results: %v\n", err)
+				os.Exit(1)
+			}
+			return
 		}
 
 		encoder := json.NewEncoder(os.Stdout)
