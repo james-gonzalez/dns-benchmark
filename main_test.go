@@ -102,7 +102,7 @@ func TestReadLines(t *testing.T) {
 	defer os.Remove(tmpfile.Name())
 
 	content := "google.com\nyahoo.com\n\nexample.com\n  "
-	if _, err := tmpfile.Write([]byte(content)); err != nil {
+	if _, err := tmpfile.WriteString(content); err != nil {
 		t.Fatal(err)
 	}
 	if err := tmpfile.Close(); err != nil {
@@ -135,7 +135,7 @@ func TestReadCSV(t *testing.T) {
 	defer os.Remove(tmpfile.Name())
 
 	content := "rank,domain,traffic\n1,google.com,high\n2,yahoo.com,medium\n"
-	if _, err := tmpfile.Write([]byte(content)); err != nil {
+	if _, err := tmpfile.WriteString(content); err != nil {
 		t.Fatal(err)
 	}
 	if err := tmpfile.Close(); err != nil {
@@ -164,7 +164,7 @@ func TestReadCSVNoHeader(t *testing.T) {
 	defer os.Remove(tmpfile.Name())
 
 	content := "google.com\nyahoo.com\n"
-	if _, err := tmpfile.Write([]byte(content)); err != nil {
+	if _, err := tmpfile.WriteString(content); err != nil {
 		t.Fatal(err)
 	}
 	if err := tmpfile.Close(); err != nil {
@@ -193,7 +193,7 @@ func TestReadServersYAML(t *testing.T) {
   - tls://1.1.1.1
   - https://dns.google/dns-query
 `
-	if _, err := tmpfile.Write([]byte(content)); err != nil {
+	if _, err := tmpfile.WriteString(content); err != nil {
 		t.Fatal(err)
 	}
 	if err := tmpfile.Close(); err != nil {
@@ -222,7 +222,7 @@ func TestReadServersTXT(t *testing.T) {
 	defer os.Remove(tmpfile.Name())
 
 	content := "8.8.8.8\n1.1.1.1\n"
-	if _, err := tmpfile.Write([]byte(content)); err != nil {
+	if _, err := tmpfile.WriteString(content); err != nil {
 		t.Fatal(err)
 	}
 	if err := tmpfile.Close(); err != nil {
@@ -327,7 +327,7 @@ timeout: 2s
 verbose: true
 progress: true
 `
-	if err := os.WriteFile(configFile, []byte(content), 0600); err != nil {
+	if err := os.WriteFile(configFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("Failed to create config file: %v", err)
 	}
 
@@ -359,7 +359,7 @@ func TestLoadConfigFileInvalid(t *testing.T) {
 
 	// Invalid YAML
 	content := "invalid: yaml: content: ["
-	if err := os.WriteFile(configFile, []byte(content), 0600); err != nil {
+	if err := os.WriteFile(configFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("Failed to create config file: %v", err)
 	}
 
@@ -402,7 +402,7 @@ func TestFindConfigFile(t *testing.T) {
 
 	// Create config file
 	configFile := ".dns-bench.yaml"
-	if err := os.WriteFile(configFile, []byte("servers: []"), 0600); err != nil {
+	if err := os.WriteFile(configFile, []byte("servers: []"), 0o600); err != nil {
 		t.Fatalf("Failed to create config file: %v", err)
 	}
 
@@ -417,7 +417,7 @@ func TestReadDomainsCSV(t *testing.T) {
 	csvFile := filepath.Join(tmpDir, "domains.csv")
 
 	content := "domain\nexample.com\ntest.com\n"
-	if err := os.WriteFile(csvFile, []byte(content), 0600); err != nil {
+	if err := os.WriteFile(csvFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("Failed to create CSV file: %v", err)
 	}
 
@@ -436,7 +436,7 @@ func TestReadDomainsTXT(t *testing.T) {
 	txtFile := filepath.Join(tmpDir, "domains.txt")
 
 	content := "example.com\ntest.com\n"
-	if err := os.WriteFile(txtFile, []byte(content), 0600); err != nil {
+	if err := os.WriteFile(txtFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("Failed to create TXT file: %v", err)
 	}
 
@@ -475,7 +475,7 @@ func TestReadServersInvalidYAML(t *testing.T) {
 
 	// Invalid YAML structure
 	content := "invalid: [yaml"
-	if err := os.WriteFile(yamlFile, []byte(content), 0600); err != nil {
+	if err := os.WriteFile(yamlFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("Failed to create YAML file: %v", err)
 	}
 

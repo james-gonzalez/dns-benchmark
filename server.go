@@ -14,9 +14,9 @@ import (
 )
 
 // ServeCmd handles serving the dashboard with API endpoints
-func serveDashboard(resultsDir string, port string) error {
+func serveDashboard(resultsDir, port string) error {
 	// Ensure results directory exists
-	if err := os.MkdirAll(resultsDir, 0755); err != nil {
+	if err := os.MkdirAll(resultsDir, 0o750); err != nil {
 		return fmt.Errorf("failed to create results directory: %w", err)
 	}
 

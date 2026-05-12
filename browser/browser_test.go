@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -112,11 +113,11 @@ func TestGetDomainsInvalidPath(t *testing.T) {
 func TestFindFirefoxProfileDefaultRelease(t *testing.T) {
 	tmpDir := t.TempDir()
 	profileDir := filepath.Join(tmpDir, "abc123.default-release")
-	if err := os.MkdirAll(profileDir, 0755); err != nil {
+	if err := os.MkdirAll(profileDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	// Create a fake places.sqlite
-	if err := os.WriteFile(filepath.Join(profileDir, "places.sqlite"), []byte{}, 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(profileDir, "places.sqlite"), []byte{}, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -132,10 +133,10 @@ func TestFindFirefoxProfileDefaultRelease(t *testing.T) {
 func TestFindFirefoxProfileDefault(t *testing.T) {
 	tmpDir := t.TempDir()
 	profileDir := filepath.Join(tmpDir, "xyz789.default")
-	if err := os.MkdirAll(profileDir, 0755); err != nil {
+	if err := os.MkdirAll(profileDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(profileDir, "places.sqlite"), []byte{}, 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(profileDir, "places.sqlite"), []byte{}, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -164,7 +165,7 @@ func TestCopyFile(t *testing.T) {
 	dstFile := filepath.Join(tmpDir, "dest.txt")
 
 	content := []byte("test content for copy")
-	if err := os.WriteFile(srcFile, content, 0600); err != nil {
+	if err := os.WriteFile(srcFile, content, 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -176,7 +177,7 @@ func TestCopyFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read destination file: %v", err)
 	}
-	if string(got) != string(content) {
+	if !bytes.Equal(got, content) {
 		t.Errorf("content mismatch: got %q, want %q", got, content)
 	}
 }
@@ -192,7 +193,7 @@ func TestCopyFileNonExistent(t *testing.T) {
 func TestCopyFileInvalidDestination(t *testing.T) {
 	tmpDir := t.TempDir()
 	srcFile := filepath.Join(tmpDir, "source.txt")
-	if err := os.WriteFile(srcFile, []byte("data"), 0600); err != nil {
+	if err := os.WriteFile(srcFile, []byte("data"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

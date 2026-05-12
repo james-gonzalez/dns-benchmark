@@ -37,7 +37,7 @@ func IsValidDomain(domain string) error {
 	}
 
 	for _, label := range labels {
-		if len(label) == 0 {
+		if label == "" {
 			return fmt.Errorf("domain contains empty label")
 		}
 		if len(label) > maxLabelLength {
@@ -115,7 +115,7 @@ func validateHostPort(hostPort string, _ int) error {
 	}
 
 	// For hostnames, do basic validation
-	if len(host) == 0 {
+	if host == "" {
 		return fmt.Errorf("host cannot be empty")
 	}
 	if len(host) > maxDomainLength {
@@ -134,8 +134,7 @@ func validateHostPort(hostPort string, _ int) error {
 }
 
 // ValidateDomains validates a list of domains and returns only valid ones with warnings
-func ValidateDomains(domains []string) ([]string, []string) {
-	valid := make([]string, 0, len(domains))
+func ValidateDomains(domains []string) (valid, invalid []string) {
 	warnings := make([]string, 0)
 
 	seen := make(map[string]bool)
@@ -165,8 +164,7 @@ func ValidateDomains(domains []string) ([]string, []string) {
 }
 
 // ValidateServers validates a list of servers and returns only valid ones with warnings
-func ValidateServers(servers []string) ([]string, []string) {
-	valid := make([]string, 0, len(servers))
+func ValidateServers(servers []string) (valid, invalid []string) {
 	warnings := make([]string, 0)
 
 	seen := make(map[string]bool)

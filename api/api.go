@@ -103,7 +103,7 @@ func writeSubmission(resultsDir string, req SubmitRequest, tsStr, fileTS string)
 		historyExists = false
 	}
 
-	hf, err := os.OpenFile(historyPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	hf, err := os.OpenFile(historyPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return fmt.Errorf("failed to open history.csv: %w", err)
 	}

@@ -186,7 +186,7 @@ func buildRemoteCommand(binaryPath string, config benchmark.Config) string {
 		}
 		// Escape single quotes in server names
 		escaped := strings.ReplaceAll(server, "'", "'\\''")
-		cmd.WriteString(fmt.Sprintf("'%s'", escaped))
+		fmt.Fprintf(&cmd, "'%s'", escaped)
 	}
 	cmd.WriteString(" > \"$servers_file\" && ")
 
@@ -198,15 +198,15 @@ func buildRemoteCommand(binaryPath string, config benchmark.Config) string {
 		}
 		// Escape single quotes in domain names
 		escaped := strings.ReplaceAll(domain, "'", "'\\''")
-		cmd.WriteString(fmt.Sprintf("'%s'", escaped))
+		fmt.Fprintf(&cmd, "'%s'", escaped)
 	}
 	cmd.WriteString(" > \"$domains_file\" && ")
 
 	// Run dns-bench with JSON output
-	cmd.WriteString(fmt.Sprintf("%s -json -servers \"$servers_file\" -domains \"$domains_file\"", binaryPath))
-	cmd.WriteString(fmt.Sprintf(" -n %d", config.Iterations))
-	cmd.WriteString(fmt.Sprintf(" -c %d", config.Concurrency))
-	cmd.WriteString(fmt.Sprintf(" -t %s", config.Timeout.String()))
+	fmt.Fprintf(&cmd, "%s -json -servers \"$servers_file\" -domains \"$domains_file\"", binaryPath)
+	fmt.Fprintf(&cmd, " -n %d", config.Iterations)
+	fmt.Fprintf(&cmd, " -c %d", config.Concurrency)
+	fmt.Fprintf(&cmd, " -t %s", config.Timeout.String())
 
 	// Clean up temp files
 	cmd.WriteString("; rm -f \"$servers_file\" \"$domains_file\"")

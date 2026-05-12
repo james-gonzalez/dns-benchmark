@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"net/http"
@@ -13,7 +14,7 @@ import (
 )
 
 func TestHealthHandler(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/health", http.NoBody)
 	rec := httptest.NewRecorder()
 
 	HealthHandler(rec, req)
@@ -38,7 +39,7 @@ func TestClearResultsHandlerMethodsAndMissingFiles(t *testing.T) {
 	handler := ClearResultsHandler(resultsDir)
 
 	t.Run("method not allowed", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/clear", nil)
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/clear", http.NoBody)
 		rec := httptest.NewRecorder()
 
 		handler(rec, req)
@@ -49,7 +50,7 @@ func TestClearResultsHandlerMethodsAndMissingFiles(t *testing.T) {
 	})
 
 	t.Run("missing files", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/clear", nil)
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/clear", http.NoBody)
 		rec := httptest.NewRecorder()
 
 		handler(rec, req)
@@ -81,7 +82,7 @@ func TestClearResultsHandlerDeletesExistingFiles(t *testing.T) {
 		}
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/clear", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/clear", http.NoBody)
 	rec := httptest.NewRecorder()
 
 	ClearResultsHandler(resultsDir)(rec, req)
@@ -115,7 +116,7 @@ func TestAuthMiddlewareNoEnvVar(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", http.NoBody)
 	rec := httptest.NewRecorder()
 	AuthMiddleware(inner)(rec, req)
 
@@ -136,7 +137,7 @@ func TestAuthMiddlewareValidKey(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", http.NoBody)
 	req.Header.Set("X-API-Key", "secret123")
 	rec := httptest.NewRecorder()
 	AuthMiddleware(inner)(rec, req)
@@ -154,7 +155,7 @@ func TestAuthMiddlewareWrongKey(t *testing.T) {
 		called = true
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", http.NoBody)
 	req.Header.Set("X-API-Key", "wrongkey")
 	rec := httptest.NewRecorder()
 	AuthMiddleware(inner)(rec, req)
@@ -175,7 +176,7 @@ func TestAuthMiddlewareMissingKey(t *testing.T) {
 		called = true
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", http.NoBody)
 	// No X-API-Key header set.
 	rec := httptest.NewRecorder()
 	AuthMiddleware(inner)(rec, req)
@@ -190,21 +191,17 @@ func TestAuthMiddlewareMissingKey(t *testing.T) {
 
 // --- SubmitResultsHandler tests ---
 
-func newSubmitHandler(t *testing.T) (http.HandlerFunc, *bool) {
+func newSubmitHandler(t *testing.T) http.HandlerFunc {
 	t.Helper()
 	resultsDir := t.TempDir()
 	mu := &sync.Mutex{}
-	regenerateCalled := false
-	regenerate := func(_ string) error {
-		regenerateCalled = true
-		return nil
-	}
-	return SubmitResultsHandler(resultsDir, mu, regenerate), &regenerateCalled
+	regenerate := func(_ string) error { return nil }
+	return SubmitResultsHandler(resultsDir, mu, regenerate)
 }
 
 func TestSubmitResultsHandlerMethodNotAllowed(t *testing.T) {
-	handler, _ := newSubmitHandler(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/submit-results", nil)
+	handler := newSubmitHandler(t)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/submit-results", http.NoBody)
 	rec := httptest.NewRecorder()
 	handler(rec, req)
 	if rec.Code != http.StatusMethodNotAllowed {
@@ -213,8 +210,8 @@ func TestSubmitResultsHandlerMethodNotAllowed(t *testing.T) {
 }
 
 func TestSubmitResultsHandlerInvalidJSON(t *testing.T) {
-	handler, _ := newSubmitHandler(t)
-	req := httptest.NewRequest(http.MethodPost, "/api/submit-results", strings.NewReader("{bad json"))
+	handler := newSubmitHandler(t)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/submit-results", strings.NewReader("{bad json"))
 	rec := httptest.NewRecorder()
 	handler(rec, req)
 	if rec.Code != http.StatusBadRequest {
@@ -230,9 +227,9 @@ func TestSubmitResultsHandlerInvalidJSON(t *testing.T) {
 }
 
 func TestSubmitResultsHandlerMissingSource(t *testing.T) {
-	handler, _ := newSubmitHandler(t)
+	handler := newSubmitHandler(t)
 	body := `{"source":"","results":[{"server":"1.1.1.1","domain":"google.com","duration_ms":10,"error":""}]}`
-	req := httptest.NewRequest(http.MethodPost, "/api/submit-results", strings.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/submit-results", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler(rec, req)
 	if rec.Code != http.StatusBadRequest {
@@ -248,9 +245,9 @@ func TestSubmitResultsHandlerMissingSource(t *testing.T) {
 }
 
 func TestSubmitResultsHandlerEmptyResults(t *testing.T) {
-	handler, _ := newSubmitHandler(t)
+	handler := newSubmitHandler(t)
 	body := `{"source":"rpi","results":[]}`
-	req := httptest.NewRequest(http.MethodPost, "/api/submit-results", strings.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/submit-results", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler(rec, req)
 	if rec.Code != http.StatusBadRequest {
@@ -266,7 +263,7 @@ func TestSubmitResultsHandlerEmptyResults(t *testing.T) {
 }
 
 func TestSubmitResultsHandlerTooManyResults(t *testing.T) {
-	handler, _ := newSubmitHandler(t)
+	handler := newSubmitHandler(t)
 	// Build a payload with 10001 results.
 	var sb strings.Builder
 	sb.WriteString(`{"source":"rpi","results":[`)
@@ -277,7 +274,7 @@ func TestSubmitResultsHandlerTooManyResults(t *testing.T) {
 		sb.WriteString(`{"server":"1.1.1.1","domain":"google.com","duration_ms":1,"error":""}`)
 	}
 	sb.WriteString(`]}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/submit-results", strings.NewReader(sb.String()))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/submit-results", strings.NewReader(sb.String()))
 	rec := httptest.NewRecorder()
 	handler(rec, req)
 	if rec.Code != http.StatusBadRequest {
@@ -303,7 +300,7 @@ func TestSubmitResultsHandlerValidRequest(t *testing.T) {
 	handler := SubmitResultsHandler(resultsDir, mu, regenerate)
 
 	body := `{"source":"rpi-4b","results":[{"server":"1.1.1.1","domain":"google.com","duration_ms":12.34,"error":""},{"server":"8.8.8.8","domain":"github.com","duration_ms":5.0,"error":"timeout"}]}`
-	req := httptest.NewRequest(http.MethodPost, "/api/submit-results", strings.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/submit-results", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler(rec, req)
 
@@ -362,7 +359,7 @@ func TestSubmitResultsHandlerAppendsToExistingHistory(t *testing.T) {
 
 	submit := func(source, server string) {
 		body := `{"source":"` + source + `","results":[{"server":"` + server + `","domain":"example.com","duration_ms":1,"error":""}]}`
-		req := httptest.NewRequest(http.MethodPost, "/api/submit-results", strings.NewReader(body))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/submit-results", strings.NewReader(body))
 		rec := httptest.NewRecorder()
 		handler(rec, req)
 		if rec.Code != http.StatusOK {
