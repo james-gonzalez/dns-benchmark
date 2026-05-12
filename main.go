@@ -301,7 +301,11 @@ func main() {
 	}
 
 	if servePort != "" {
-		if err := serveDashboard(".", servePort); err != nil {
+		resultsDir := os.Getenv("DNS_BENCH_RESULTS_DIR")
+		if resultsDir == "" {
+			resultsDir = "."
+		}
+		if err := serveDashboard(resultsDir, servePort); err != nil {
 			fmt.Fprintf(os.Stderr, "Error starting dashboard server: %v\n", err)
 			os.Exit(1)
 		}
