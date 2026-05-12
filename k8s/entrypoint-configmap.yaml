@@ -7,6 +7,7 @@ data:
 
     RESULTS_DIR="/results"
     TIMESTAMP=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
+    SOURCE="k8s-pod"
     HISTORY_CSV="${RESULTS_DIR}/history.csv"
     RUN_CSV="${RESULTS_DIR}/results-${TIMESTAMP}.csv"
 
@@ -19,6 +20,7 @@ data:
       -c=20 \
       -n=3 \
       -t=3s \
+      -source="${SOURCE}" \
       -o="${RUN_CSV}" \
       -html="${RESULTS_DIR}/report-${TIMESTAMP}.html" \
       -progress
@@ -27,9 +29,9 @@ data:
 
     # Append this run's results to the master history CSV, tagging each row with the timestamp.
     if [ ! -f "${HISTORY_CSV}" ]; then
-      echo "Timestamp,Server,Domain,Duration_ms,Error" > "${HISTORY_CSV}"
+      echo "Timestamp,Server,Domain,Duration_ms,Error,Source" > "${HISTORY_CSV}"
     fi
-    # Append data rows (skip header line of the per-run CSV)
+    # Append data rows (skip header line of the per-run CSV), prepending timestamp
     tail -n +2 "${RUN_CSV}" | sed "s/^/${TIMESTAMP},/" >> "${HISTORY_CSV}"
 
     echo "==> Regenerating dashboard..."

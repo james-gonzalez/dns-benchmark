@@ -248,7 +248,7 @@ func TestExportCSV(t *testing.T) {
 	tmpfile := filepath.Join(os.TempDir(), "test-export.csv")
 	defer os.Remove(tmpfile)
 
-	err := exportCSV(results, tmpfile)
+	err := exportCSV(results, tmpfile, "")
 	if err != nil {
 		t.Fatalf("exportCSV failed: %v", err)
 	}

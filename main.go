@@ -170,17 +170,20 @@ type jsonResult struct {
 }
 
 // pushResults sends benchmark results to a remote server via HTTP POST.
-func pushResults(url string, results []jsonResult) error {
-	hostname, err := os.Hostname()
-	if err != nil {
-		hostname = "unknown"
+func pushResults(url, source string, results []jsonResult) error {
+	if source == "" {
+		var err error
+		source, err = os.Hostname()
+		if err != nil {
+			source = "unknown"
+		}
 	}
 
 	payload := struct {
 		Source  string       `json:"source"`
 		Results []jsonResult `json:"results"`
 	}{
-		Source:  hostname,
+		Source:  source,
 		Results: results,
 	}
 
@@ -271,6 +274,7 @@ func main() {
 		jsonOutput      bool
 		distributedFile string
 		pushURL         string
+		source          string
 	)
 
 	flag.StringVar(&configFile, "config", "", "Path to config file (YAML)")
@@ -289,6 +293,7 @@ func main() {
 	flag.BoolVar(&jsonOutput, "json", false, "Output results as JSON to stdout (for distributed mode)")
 	flag.StringVar(&distributedFile, "distributed", "", "Path to hosts.yaml for distributed multi-host testing")
 	flag.StringVar(&pushURL, "push", "", "URL to push JSON results to (e.g. https://dns-bench.home.local/api/submit-results)")
+	flag.StringVar(&source, "source", "", "Source label for this host (used in CSV and push payloads; defaults to hostname)")
 	flag.Parse()
 
 	// Dashboard-only mode: generate index.html and exit.
@@ -565,7 +570,7 @@ func main() {
 		}
 
 		if pushURL != "" {
-			if err := pushResults(pushURL, jsonResults); err != nil {
+			if err := pushResults(pushURL, source, jsonResults); err != nil {
 				fmt.Fprintf(os.Stderr, "Error pushing results: %v\n", err)
 				os.Exit(1)
 			}
@@ -584,7 +589,7 @@ func main() {
 	printTable(stats, totalTime)
 
 	if cfg.ExportCSV != "" {
-		if err := exportCSV(results, cfg.ExportCSV); err != nil {
+		if err := exportCSV(results, cfg.ExportCSV, source); err != nil {
 			fmt.Printf("Error exporting results: %v\n", err)
 		} else {
 			fmt.Printf("Results exported to %s\n", cfg.ExportCSV)
@@ -785,7 +790,7 @@ func readLines(path string) ([]string, error) {
 	return lines, scanner.Err()
 }
 
-func exportCSV(results []benchmark.Result, path string) error {
+func exportCSV(results []benchmark.Result, path, source string) error {
 	file, err := os.Create(path)
 	if err != nil {
 		return err
@@ -799,8 +804,11 @@ func exportCSV(results []benchmark.Result, path string) error {
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	// Header
-	if err := writer.Write([]string{"Server", "Domain", "Duration_ms", "Error"}); err != nil {
+	header := []string{"Server", "Domain", "Duration_ms", "Error"}
+	if source != "" {
+		header = append(header, "Source")
+	}
+	if err := writer.Write(header); err != nil {
 		return err
 	}
 
@@ -814,6 +822,9 @@ func exportCSV(results []benchmark.Result, path string) error {
 			res.Domain,
 			strconv.FormatFloat(float64(res.Duration.Microseconds())/1000.0, 'f', 4, 64),
 			errStr,
+		}
+		if source != "" {
+			record = append(record, source)
 		}
 		if err := writer.Write(record); err != nil {
 			return err
