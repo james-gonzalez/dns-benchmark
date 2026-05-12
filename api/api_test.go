@@ -110,7 +110,7 @@ func TestAuthMiddlewareNoEnvVar(t *testing.T) {
 	os.Unsetenv("DNS_BENCH_API_KEY")
 
 	called := false
-	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
 	})
@@ -131,7 +131,7 @@ func TestAuthMiddlewareValidKey(t *testing.T) {
 	t.Setenv("DNS_BENCH_API_KEY", "secret123")
 
 	called := false
-	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
 	})
@@ -150,7 +150,7 @@ func TestAuthMiddlewareWrongKey(t *testing.T) {
 	t.Setenv("DNS_BENCH_API_KEY", "secret123")
 
 	called := false
-	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	inner := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		called = true
 	})
 
@@ -171,7 +171,7 @@ func TestAuthMiddlewareMissingKey(t *testing.T) {
 	t.Setenv("DNS_BENCH_API_KEY", "secret123")
 
 	called := false
-	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	inner := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		called = true
 	})
 
@@ -190,7 +190,7 @@ func TestAuthMiddlewareMissingKey(t *testing.T) {
 
 // --- SubmitResultsHandler tests ---
 
-func newSubmitHandler(t *testing.T) (http.HandlerFunc, string, *bool) {
+func newSubmitHandler(t *testing.T) (http.HandlerFunc, *bool) {
 	t.Helper()
 	resultsDir := t.TempDir()
 	mu := &sync.Mutex{}
@@ -199,11 +199,11 @@ func newSubmitHandler(t *testing.T) (http.HandlerFunc, string, *bool) {
 		regenerateCalled = true
 		return nil
 	}
-	return SubmitResultsHandler(resultsDir, mu, regenerate), resultsDir, &regenerateCalled
+	return SubmitResultsHandler(resultsDir, mu, regenerate), &regenerateCalled
 }
 
 func TestSubmitResultsHandlerMethodNotAllowed(t *testing.T) {
-	handler, _, _ := newSubmitHandler(t)
+	handler, _ := newSubmitHandler(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/submit-results", nil)
 	rec := httptest.NewRecorder()
 	handler(rec, req)
@@ -213,7 +213,7 @@ func TestSubmitResultsHandlerMethodNotAllowed(t *testing.T) {
 }
 
 func TestSubmitResultsHandlerInvalidJSON(t *testing.T) {
-	handler, _, _ := newSubmitHandler(t)
+	handler, _ := newSubmitHandler(t)
 	req := httptest.NewRequest(http.MethodPost, "/api/submit-results", strings.NewReader("{bad json"))
 	rec := httptest.NewRecorder()
 	handler(rec, req)
@@ -221,14 +221,16 @@ func TestSubmitResultsHandlerInvalidJSON(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 	var body map[string]string
-	json.NewDecoder(rec.Body).Decode(&body)
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	if !strings.Contains(body["error"], "invalid JSON") {
 		t.Fatalf("error = %q, want to contain 'invalid JSON'", body["error"])
 	}
 }
 
 func TestSubmitResultsHandlerMissingSource(t *testing.T) {
-	handler, _, _ := newSubmitHandler(t)
+	handler, _ := newSubmitHandler(t)
 	body := `{"source":"","results":[{"server":"1.1.1.1","domain":"google.com","duration_ms":10,"error":""}]}`
 	req := httptest.NewRequest(http.MethodPost, "/api/submit-results", strings.NewReader(body))
 	rec := httptest.NewRecorder()
@@ -237,14 +239,16 @@ func TestSubmitResultsHandlerMissingSource(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 	var resp map[string]string
-	json.NewDecoder(rec.Body).Decode(&resp)
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	if resp["error"] != "source is required" {
 		t.Fatalf("error = %q, want 'source is required'", resp["error"])
 	}
 }
 
 func TestSubmitResultsHandlerEmptyResults(t *testing.T) {
-	handler, _, _ := newSubmitHandler(t)
+	handler, _ := newSubmitHandler(t)
 	body := `{"source":"rpi","results":[]}`
 	req := httptest.NewRequest(http.MethodPost, "/api/submit-results", strings.NewReader(body))
 	rec := httptest.NewRecorder()
@@ -253,14 +257,16 @@ func TestSubmitResultsHandlerEmptyResults(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 	var resp map[string]string
-	json.NewDecoder(rec.Body).Decode(&resp)
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	if resp["error"] != "results must not be empty" {
 		t.Fatalf("error = %q, want 'results must not be empty'", resp["error"])
 	}
 }
 
 func TestSubmitResultsHandlerTooManyResults(t *testing.T) {
-	handler, _, _ := newSubmitHandler(t)
+	handler, _ := newSubmitHandler(t)
 	// Build a payload with 10001 results.
 	var sb strings.Builder
 	sb.WriteString(`{"source":"rpi","results":[`)
@@ -278,7 +284,9 @@ func TestSubmitResultsHandlerTooManyResults(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 	var resp map[string]string
-	json.NewDecoder(rec.Body).Decode(&resp)
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	if !strings.Contains(resp["error"], "10000") {
 		t.Fatalf("error = %q, want to mention 10000", resp["error"])
 	}
