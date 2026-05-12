@@ -31,11 +31,19 @@ type ServerStat struct {
 	Avg    float64
 }
 
+// SourceStats holds per-source server stats for the filter tabs.
+type SourceStats struct {
+	Source       string
+	PublicStats  []ServerStat
+	PrivateStats []ServerStat
+}
+
 // TemplateData is passed to the HTML template.
 type TemplateData struct {
 	GeneratedAt    string
 	PublicStats    []ServerStat
 	PrivateStats   []ServerStat
+	Sources        []SourceStats
 	RecentRuns     []RunEntry
 	ArchivedMonths []MonthGroup
 }
@@ -81,6 +89,11 @@ func Generate(resultsDir string) error {
 	publicCounts := map[string]int{}
 	privateSums := map[string]float64{}
 	privateCounts := map[string]int{}
+	// per-source: source -> server -> sum/count
+	srcPubSums := map[string]map[string]float64{}
+	srcPubCounts := map[string]map[string]int{}
+	srcPrivSums := map[string]map[string]float64{}
+	srcPrivCounts := map[string]map[string]int{}
 
 	f, err := os.Open(historyPath)
 	if err != nil && !os.IsNotExist(err) {
@@ -92,13 +105,40 @@ func Generate(resultsDir string) error {
 				fmt.Fprintf(os.Stderr, "warning: closing history.csv: %v\n", cerr)
 			}
 		}()
-		if err := parseHistory(f, publicSums, publicCounts, privateSums, privateCounts); err != nil {
+		if err := parseHistory(f, publicSums, publicCounts, privateSums, privateCounts,
+			srcPubSums, srcPubCounts, srcPrivSums, srcPrivCounts); err != nil {
 			return fmt.Errorf("parsing history.csv: %w", err)
 		}
 	}
 
 	publicStats := buildStats(publicSums, publicCounts)
 	privateStats := buildStats(privateSums, privateCounts)
+
+	// Build per-source stats, sorted by source name.
+	sourceNames := make([]string, 0, len(srcPubSums))
+	seen := map[string]bool{}
+	for s := range srcPubSums {
+		if !seen[s] {
+			seen[s] = true
+			sourceNames = append(sourceNames, s)
+		}
+	}
+	for s := range srcPrivSums {
+		if !seen[s] {
+			seen[s] = true
+			sourceNames = append(sourceNames, s)
+		}
+	}
+	sort.Strings(sourceNames)
+
+	sources := make([]SourceStats, 0, len(sourceNames))
+	for _, src := range sourceNames {
+		sources = append(sources, SourceStats{
+			Source:       src,
+			PublicStats:  buildStats(srcPubSums[src], srcPubCounts[src]),
+			PrivateStats: buildStats(srcPrivSums[src], srcPrivCounts[src]),
+		})
+	}
 
 	recent, archived, err := collectRuns(resultsDir)
 	if err != nil {
@@ -109,6 +149,7 @@ func Generate(resultsDir string) error {
 		GeneratedAt:    time.Now().UTC().Format("02 Jan 2006, 15:04 UTC"),
 		PublicStats:    publicStats,
 		PrivateStats:   privateStats,
+		Sources:        sources,
 		RecentRuns:     recent,
 		ArchivedMonths: archived,
 	}
@@ -134,7 +175,9 @@ func Generate(resultsDir string) error {
 	return tmpl.Execute(out, data)
 }
 
-func parseHistory(r io.Reader, pubSums map[string]float64, pubCounts map[string]int, privSums map[string]float64, privCounts map[string]int) error {
+func parseHistory(r io.Reader, pubSums map[string]float64, pubCounts map[string]int, privSums map[string]float64, privCounts map[string]int,
+	srcPubSums map[string]map[string]float64, srcPubCounts map[string]map[string]int,
+	srcPrivSums map[string]map[string]float64, srcPrivCounts map[string]map[string]int) error {
 	cr := csv.NewReader(r)
 	cr.FieldsPerRecord = -1 // tolerate variable columns
 
@@ -151,7 +194,7 @@ func parseHistory(r io.Reader, pubSums map[string]float64, pubCounts map[string]
 		if err != nil {
 			return err
 		}
-		// columns: Timestamp, Server, Domain, Duration_ms, Error
+		// columns: Timestamp, Server, Domain, Duration_ms, Error[, Source]
 		if len(rec) < 4 {
 			continue
 		}
@@ -167,12 +210,33 @@ func parseHistory(r io.Reader, pubSums map[string]float64, pubCounts map[string]
 		if err != nil || dur <= 0 {
 			continue
 		}
+		source := ""
+		if len(rec) >= 6 {
+			source = strings.TrimSpace(rec[5])
+		}
+
 		if isPrivate(server) {
 			privSums[server] += dur
 			privCounts[server]++
+			if source != "" {
+				if srcPrivSums[source] == nil {
+					srcPrivSums[source] = map[string]float64{}
+					srcPrivCounts[source] = map[string]int{}
+				}
+				srcPrivSums[source][server] += dur
+				srcPrivCounts[source][server]++
+			}
 		} else {
 			pubSums[server] += dur
 			pubCounts[server]++
+			if source != "" {
+				if srcPubSums[source] == nil {
+					srcPubSums[source] = map[string]float64{}
+					srcPubCounts[source] = map[string]int{}
+				}
+				srcPubSums[source][server] += dur
+				srcPubCounts[source][server]++
+			}
 		}
 	}
 	return nil

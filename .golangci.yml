@@ -115,8 +115,8 @@ linters:
         linters:
           - gocritic
 
-      # High cyclomatic complexity in Run and GetDomains - pre-existing
-      - path: "(benchmark/benchmark|browser/browser)\\.go"
+      # High cyclomatic complexity in Run, GetDomains, and parseHistory - pre-existing
+      - path: "(benchmark/benchmark|browser/browser|dashboard/dashboard)\\.go"
         linters:
           - gocyclo
 

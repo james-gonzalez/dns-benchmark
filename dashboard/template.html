@@ -44,6 +44,12 @@
     .btn-secondary { background: #6b7280; color: white; }
     .btn-secondary:hover { background: #4b5563; }
     .success-msg { color: #10b981; padding: 1rem 0; }
+    /* Source filter tabs */
+    .source-filter { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; padding: 0.75rem 1.5rem; background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 2rem; }
+    .source-filter-label { font-size: 0.8rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-right: 0.25rem; }
+    .source-tab { padding: 0.35rem 0.9rem; border: 1.5px solid #e2e8f0; border-radius: 20px; background: transparent; color: #64748b; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.15s ease; }
+    .source-tab:hover { border-color: #3b82f6; color: #3b82f6; }
+    .source-tab.active { background: #16213e; border-color: #16213e; color: #e2e8f0; }
   </style>
 </head>
 <body>
@@ -66,18 +72,37 @@
     <div class="chart-wrap"><canvas id="privateChart"></canvas></div>
   </div>
 
+  {{if .Sources}}
+  <div class="source-filter">
+    <span class="source-filter-label">Source</span>
+    <button class="source-tab active" data-source="all" onclick="switchSource('all')">All</button>
+    {{range .Sources}}
+    <button class="source-tab" data-source="{{if .Source}}{{.Source}}{{else}}k3s-pod{{end}}" onclick="switchSource('{{if .Source}}{{.Source}}{{else}}k3s-pod{{end}}')">{{if .Source}}{{.Source}}{{else}}k3s-pod{{end}}</button>
+    {{end}}
+  </div>
+  {{end}}
+
   <div class="card">
     <h2>Public DNS Rankings</h2>
     <p class="updated">All-time averages from history.csv</p>
     <table>
       <thead><tr><th>#</th><th>Server</th><th>Avg Latency (ms)</th></tr></thead>
-      <tbody>
+      <tbody class="source-body" data-source="all">
         {{range $i, $s := .PublicStats}}
         <tr><td>{{add $i 1}}</td><td><code>{{$s.Server}}</code></td><td>{{printf "%.3f" $s.Avg}}</td></tr>
         {{else}}
         <tr><td colspan="3">No data yet.</td></tr>
         {{end}}
       </tbody>
+      {{range .Sources}}
+      <tbody class="source-body" data-source="{{if .Source}}{{.Source}}{{else}}k3s-pod{{end}}" style="display:none">
+        {{range $i, $s := .PublicStats}}
+        <tr><td>{{add $i 1}}</td><td><code>{{$s.Server}}</code></td><td>{{printf "%.3f" $s.Avg}}</td></tr>
+        {{else}}
+        <tr><td colspan="3">No data yet.</td></tr>
+        {{end}}
+      </tbody>
+      {{end}}
     </table>
   </div>
 
@@ -86,13 +111,22 @@
     <p class="updated">All-time averages from history.csv</p>
     <table>
       <thead><tr><th>#</th><th>Server</th><th>Avg Latency (ms)</th></tr></thead>
-      <tbody>
+      <tbody class="source-body" data-source="all">
         {{range $i, $s := .PrivateStats}}
         <tr><td>{{add $i 1}}</td><td><code>{{$s.Server}}</code></td><td>{{printf "%.3f" $s.Avg}}</td></tr>
         {{else}}
         <tr><td colspan="3">No data yet.</td></tr>
         {{end}}
       </tbody>
+      {{range .Sources}}
+      <tbody class="source-body" data-source="{{if .Source}}{{.Source}}{{else}}k3s-pod{{end}}" style="display:none">
+        {{range $i, $s := .PrivateStats}}
+        <tr><td>{{add $i 1}}</td><td><code>{{$s.Server}}</code></td><td>{{printf "%.3f" $s.Avg}}</td></tr>
+        {{else}}
+        <tr><td colspan="3">No data yet.</td></tr>
+        {{end}}
+      </tbody>
+      {{end}}
     </table>
   </div>
 
@@ -244,43 +278,74 @@ const chartOptions = {
   }
 };
 
+let rawRows = [];
+let publicChartInstance = null;
+let privateChartInstance = null;
+
+function buildChartData(sourceFilter) {
+  const byServerByTime = {};
+  const allTimestamps = new Set();
+
+  rawRows.forEach(rec => {
+    const [ts, server, , durStr, err, src] = rec;
+    if (sourceFilter !== 'all') {
+      const rowSource = (src || '').trim();
+      const targetSource = sourceFilter === 'k3s-pod' ? '' : sourceFilter;
+      if (rowSource !== targetSource) return;
+    }
+    if (err && err.trim()) return;
+    const dur = parseFloat(durStr);
+    if (!dur || dur <= 0) return;
+    allTimestamps.add(ts);
+    if (!byServerByTime[server]) byServerByTime[server] = {};
+    if (!byServerByTime[server][ts]) byServerByTime[server][ts] = { sum: 0, count: 0 };
+    byServerByTime[server][ts].sum += dur;
+    byServerByTime[server][ts].count++;
+  });
+
+  return { byServerByTime, timestamps: [...allTimestamps].sort() };
+}
+
+function renderCharts(sourceFilter) {
+  if (publicChartInstance) { publicChartInstance.destroy(); publicChartInstance = null; }
+  if (privateChartInstance) { privateChartInstance.destroy(); privateChartInstance = null; }
+
+  const { byServerByTime, timestamps } = buildChartData(sourceFilter);
+  const servers = Object.keys(byServerByTime).sort();
+  const publicServers  = servers.filter(s => !isPrivate(s));
+  const privateServers = servers.filter(s =>  isPrivate(s));
+
+  publicChartInstance = new Chart(document.getElementById('publicChart'), {
+    type: 'line',
+    data: { labels: timestamps, datasets: buildDatasets(publicServers, byServerByTime, timestamps) },
+    options: chartOptions,
+  });
+
+  privateChartInstance = new Chart(document.getElementById('privateChart'), {
+    type: 'line',
+    data: { labels: timestamps, datasets: buildDatasets(privateServers, byServerByTime, timestamps) },
+    options: chartOptions,
+  });
+}
+
+function switchSource(sourceKey) {
+  document.querySelectorAll('.source-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.source === sourceKey);
+  });
+  document.querySelectorAll('.source-body').forEach(tbody => {
+    tbody.style.display = tbody.dataset.source === sourceKey ? '' : 'none';
+  });
+  renderCharts(sourceKey);
+}
+
 fetch('history.csv')
   .then(r => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.text();
   })
   .then(csvText => {
-    const byServerByTime = {};
-    const allTimestamps = new Set();
-
-    csvText.trim().split('\n').slice(1).filter(Boolean).forEach(row => {
-      const [ts, server, , durStr, err] = row.split(',');
-      if (err && err.trim()) return;
-      const dur = parseFloat(durStr);
-      if (!dur || dur <= 0) return;
-      allTimestamps.add(ts);
-      if (!byServerByTime[server]) byServerByTime[server] = {};
-      if (!byServerByTime[server][ts]) byServerByTime[server][ts] = { sum: 0, count: 0 };
-      byServerByTime[server][ts].sum += dur;
-      byServerByTime[server][ts].count++;
-    });
-
-    const timestamps = [...allTimestamps].sort();
-    const servers = Object.keys(byServerByTime).sort();
-    const publicServers  = servers.filter(s => !isPrivate(s));
-    const privateServers = servers.filter(s =>  isPrivate(s));
-
-    new Chart(document.getElementById('publicChart'), {
-      type: 'line',
-      data: { labels: timestamps, datasets: buildDatasets(publicServers, byServerByTime, timestamps) },
-      options: chartOptions,
-    });
-
-    new Chart(document.getElementById('privateChart'), {
-      type: 'line',
-      data: { labels: timestamps, datasets: buildDatasets(privateServers, byServerByTime, timestamps) },
-      options: chartOptions,
-    });
+    rawRows = csvText.trim().split('\n').slice(1).filter(Boolean).map(row => row.split(','));
+    renderCharts('all');
   })
   .catch(err => {
     ['publicChart', 'privateChart'].forEach(id => {
