@@ -82,16 +82,16 @@ func TestBuildStats(t *testing.T) {
 		t.Errorf("expected 3 stats, got %d", len(stats))
 	}
 
-	// Should be sorted by average (ascending)
-	if stats[0].Server != "9.9.9.9" {
-		t.Errorf("expected first server to be 9.9.9.9, got %s", stats[0].Server)
+	// Should be sorted by average (ascending), ties broken alphabetically by server
+	if stats[0].Server != "1.1.1.1" {
+		t.Errorf("expected first server to be 1.1.1.1, got %s", stats[0].Server)
 	}
 	if stats[0].Avg != 25.0 {
 		t.Errorf("expected avg 25.0, got %f", stats[0].Avg)
 	}
 
-	if stats[1].Server != "1.1.1.1" {
-		t.Errorf("expected second server to be 1.1.1.1, got %s", stats[1].Server)
+	if stats[1].Server != "9.9.9.9" {
+		t.Errorf("expected second server to be 9.9.9.9, got %s", stats[1].Server)
 	}
 	if stats[1].Avg != 25.0 {
 		t.Errorf("expected avg 25.0, got %f", stats[1].Avg)

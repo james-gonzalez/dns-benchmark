@@ -15,7 +15,7 @@ permissions:
 jobs:
   release-and-publish:
     name: Release and Publish Binaries
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, k8s]
     # Only run if the CI workflow succeeded
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:

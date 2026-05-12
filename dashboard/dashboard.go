@@ -255,7 +255,10 @@ func buildStats(sums map[string]float64, counts map[string]int) []ServerStat {
 		})
 	}
 	sort.Slice(stats, func(i, j int) bool {
-		return stats[i].Avg < stats[j].Avg
+		if stats[i].Avg != stats[j].Avg {
+			return stats[i].Avg < stats[j].Avg
+		}
+		return stats[i].Server < stats[j].Server
 	})
 	return stats
 }
