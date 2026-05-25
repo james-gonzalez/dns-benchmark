@@ -7,70 +7,136 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f0f2f5; color: #1a1a2e; }
-    header { background: #16213e; color: #e2e8f0; padding: 1.5rem 2rem; }
-    header h1 { margin: 0; font-size: 1.6rem; }
-    header p  { margin: 0.25rem 0 0; font-size: 0.9rem; color: #94a3b8; }
-    main { max-width: 1100px; margin: 2rem auto; padding: 0 1.5rem; }
-    .card { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 1.5rem; margin-bottom: 2rem; }
-    h2 { margin-top: 0; font-size: 1.1rem; color: #16213e; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-    th { background: #16213e; color: white; padding: 10px 14px; text-align: left; }
-    td { padding: 9px 14px; border-bottom: 1px solid #f0f2f5; }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: #f8fafc; }
-    a { color: #3b82f6; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .chart-wrap { position: relative; height: 360px; }
-    .updated { font-size: 0.8rem; color: #94a3b8; text-align: right; margin-top: -1rem; margin-bottom: 1rem; }
-    .section-subtitle { color: #64748b; font-size: 0.9rem; margin-top: -0.4rem; margin-bottom: 1rem; }
-    .month-group { border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 0.75rem; overflow: hidden; }
-    .month-group > summary { cursor: pointer; list-style: none; padding: 0.85rem 1rem; font-weight: 600; background: #f8fafc; color: #1e293b; }
-    .month-group > summary::-webkit-details-marker { display: none; }
-    .month-group > summary::before { content: "▶"; display: inline-block; margin-right: 0.5rem; color: #64748b; transition: transform 0.2s ease; }
-    .month-group[open] > summary::before { transform: rotate(90deg); }
-    .loading { color: #94a3b8; font-style: italic; padding: 1rem 0; }
-    .error-msg { color: #ef4444; padding: 1rem 0; }
-    .header-actions { display: flex; gap: 1rem; align-items: center; margin-top: 1rem; }
-    .btn { padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
-    .btn-danger { background: #ef4444; color: white; }
+
+    :root {
+      --bg: #f0f2f5;
+      --surface: #ffffff;
+      --navy: #0f172a;
+      --navy-mid: #1e293b;
+      --accent: #3b82f6;
+      --accent-dim: #dbeafe;
+      --text: #0f172a;
+      --text-mid: #475569;
+      --text-dim: #94a3b8;
+      --border: #e2e8f0;
+      --good: #10b981;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --radius: 12px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.06);
+    }
+
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
+
+    /* ── Header ── */
+    header {
+      background: var(--navy);
+      color: white;
+      padding: 1.5rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .header-left h1 { margin: 0; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; }
+    .header-left p  { margin: 0.2rem 0 0; font-size: 0.8rem; color: var(--text-dim); }
+    .btn { padding: 0.45rem 1rem; border: none; border-radius: 8px; cursor: pointer; font-size: 0.82rem; font-weight: 500; transition: all 0.15s; white-space: nowrap; }
+    .btn-ghost { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.12); }
+    .btn-ghost:hover { background: rgba(255,255,255,0.14); color: white; }
+    .btn-danger { background: var(--bad); color: white; }
     .btn-danger:hover { background: #dc2626; }
     .btn-danger:disabled { background: #a3a3a3; cursor: not-allowed; }
-    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
-    .modal.show { display: flex; align-items: center; justify-content: center; }
-    .modal-content { background-color: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 400px; text-align: center; }
-    .modal-content h2 { margin-top: 0; color: #ef4444; }
-    .modal-actions { display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; }
     .btn-secondary { background: #6b7280; color: white; }
     .btn-secondary:hover { background: #4b5563; }
-    .success-msg { color: #10b981; padding: 1rem 0; }
-    /* Source filter tabs */
-    .source-filter { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; padding: 0.75rem 1.5rem; background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 2rem; }
-    .source-filter-label { font-size: 0.8rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-right: 0.25rem; }
-    .source-tab { padding: 0.35rem 0.9rem; border: 1.5px solid #e2e8f0; border-radius: 20px; background: transparent; color: #64748b; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.15s ease; }
-    .source-tab:hover { border-color: #3b82f6; color: #3b82f6; }
-    .source-tab.active { background: #16213e; border-color: #16213e; color: #e2e8f0; }
+
+    /* ── Main layout ── */
+    main { max-width: 1140px; margin: 2rem auto; padding: 0 1.5rem 3rem; }
+
+    /* ── Cards ── */
+    .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem; margin-bottom: 1.5rem; }
+    .card-header { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+    .card-title { margin: 0; font-size: 0.95rem; font-weight: 600; color: var(--navy-mid); }
+    .card-meta { font-size: 0.78rem; color: var(--text-dim); white-space: nowrap; }
+
+    /* ── Source tabs ── */
+    .source-filter {
+      display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
+      background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 0.75rem 1.25rem; margin-bottom: 1.5rem;
+    }
+    .source-filter-label { font-size: 0.75rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-right: 0.25rem; }
+    .source-tab { padding: 0.3rem 0.85rem; border: 1.5px solid var(--border); border-radius: 20px; background: transparent; color: var(--text-mid); font-size: 0.82rem; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+    .source-tab:hover { border-color: var(--accent); color: var(--accent); }
+    .source-tab.active { background: var(--navy); border-color: var(--navy); color: white; }
+
+    /* ── Charts ── */
+    .chart-wrap { position: relative; height: 300px; }
+    .chart-empty { display: flex; align-items: center; justify-content: center; height: 80px; color: var(--text-dim); font-size: 0.9rem; border: 2px dashed var(--border); border-radius: 8px; }
+
+    /* ── Tables ── */
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    thead th { background: var(--navy); color: white; padding: 10px 14px; text-align: left; font-weight: 500; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    thead th:first-child { border-radius: 6px 0 0 6px; }
+    thead th:last-child  { border-radius: 0 6px 6px 0; }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* Rank badge */
+    .rank-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; border-radius: 50%;
+      font-size: 0.75rem; font-weight: 700;
+      background: var(--border); color: var(--text-mid);
+    }
+    .rank-badge.rank-1 { background: #fef3c7; color: #b45309; }
+    .rank-badge.rank-2 { background: #f1f5f9; color: #475569; }
+    .rank-badge.rank-3 { background: #fef2f2; color: #b91c1c; }
+
+    /* Latency pill */
+    .lat { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.82rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+    .lat-good  { background: #d1fae5; color: #065f46; }
+    .lat-warn  { background: #fef3c7; color: #92400e; }
+    .lat-bad   { background: #fee2e2; color: #991b1b; }
+    .lat-plain { background: var(--bg); color: var(--text-mid); }
+
+    /* Server name */
+    code { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.82rem; background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+
+    /* Month groups */
+    .month-group { border: 1px solid var(--border); border-radius: 8px; margin-top: 0.6rem; overflow: hidden; }
+    .month-group > summary { cursor: pointer; list-style: none; padding: 0.75rem 1rem; font-weight: 600; font-size: 0.85rem; background: #f8fafc; color: var(--navy-mid); }
+    .month-group > summary::-webkit-details-marker { display: none; }
+    .month-group > summary::before { content: "▶"; display: inline-block; margin-right: 0.5rem; color: var(--text-dim); transition: transform 0.2s; }
+    .month-group[open] > summary::before { transform: rotate(90deg); }
+    .month-group table { margin: 0; }
+
+    /* Modal */
+    .modal { display: none; position: fixed; z-index: 1000; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(2px); }
+    .modal.show { display: flex; align-items: center; justify-content: center; }
+    .modal-content { background: white; padding: 2rem; border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); max-width: 380px; width: 90%; text-align: center; }
+    .modal-content h2 { margin-top: 0; color: var(--bad); font-size: 1.1rem; }
+    .modal-content p { color: var(--text-mid); font-size: 0.9rem; }
+    .modal-actions { display: flex; gap: 0.75rem; justify-content: center; margin-top: 1.5rem; }
+
+    .success-msg { color: var(--good); font-size: 0.88rem; margin-top: 0.75rem; }
+    .error-msg   { color: var(--bad);  font-size: 0.88rem; }
+    .loading     { color: var(--text-dim); font-style: italic; padding: 1rem 0; }
   </style>
 </head>
 <body>
+
 <header>
-  <h1>DNS Benchmark Dashboard</h1>
-  <p>Generated {{.GeneratedAt}}</p>
-  <div class="header-actions">
-    <button class="btn btn-danger" onclick="showClearModal()">🗑️ Clear All Results</button>
+  <div class="header-left">
+    <h1>DNS Benchmark Dashboard</h1>
+    <p>Generated {{.GeneratedAt}}</p>
   </div>
+  <button class="btn btn-ghost" onclick="showClearModal()">Clear Results</button>
 </header>
+
 <main>
-
-  <div class="card">
-    <h2>Public DNS — Average Latency Over Time</h2>
-    <div class="chart-wrap"><canvas id="publicChart"></canvas></div>
-  </div>
-
-  <div class="card">
-    <h2>Private / Local DNS — Average Latency Over Time</h2>
-    <div class="chart-wrap"><canvas id="privateChart"></canvas></div>
-  </div>
 
   {{if .Sources}}
   <div class="source-filter">
@@ -83,23 +149,47 @@
   {{end}}
 
   <div class="card">
-    <h2>Public DNS Rankings</h2>
-    <p class="updated">All-time averages from history.csv</p>
+    <div class="card-header">
+      <h2 class="card-title">Public DNS — Average Latency Over Time</h2>
+    </div>
+    <div class="chart-wrap"><canvas id="publicChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Private / Local DNS — Average Latency Over Time</h2>
+    </div>
+    <div class="chart-wrap"><canvas id="privateChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Public DNS Rankings</h2>
+      <span class="card-meta">All-time averages · history.csv</span>
+    </div>
     <table>
-      <thead><tr><th>#</th><th>Server</th><th>Avg Latency (ms)</th></tr></thead>
+      <thead><tr><th>#</th><th>Server</th><th>Avg Latency</th></tr></thead>
       <tbody class="source-body" data-source="all">
         {{range $i, $s := .PublicStats}}
-        <tr><td>{{add $i 1}}</td><td><code>{{$s.Server}}</code></td><td>{{printf "%.3f" $s.Avg}}</td></tr>
+        <tr>
+          <td><span class="rank-badge {{if eq $i 0}}rank-1{{else if eq $i 1}}rank-2{{else if eq $i 2}}rank-3{{end}}">{{add $i 1}}</span></td>
+          <td><code>{{$s.Server}}</code></td>
+          <td><span class="lat" data-ms="{{printf "%.3f" $s.Avg}}">{{printf "%.3f" $s.Avg}} ms</span></td>
+        </tr>
         {{else}}
-        <tr><td colspan="3">No data yet.</td></tr>
+        <tr><td colspan="3" style="color:var(--text-dim);font-style:italic">No data yet.</td></tr>
         {{end}}
       </tbody>
       {{range .Sources}}
       <tbody class="source-body" data-source="{{if .Source}}{{.Source}}{{else}}k3s-pod{{end}}" style="display:none">
         {{range $i, $s := .PublicStats}}
-        <tr><td>{{add $i 1}}</td><td><code>{{$s.Server}}</code></td><td>{{printf "%.3f" $s.Avg}}</td></tr>
+        <tr>
+          <td><span class="rank-badge {{if eq $i 0}}rank-1{{else if eq $i 1}}rank-2{{else if eq $i 2}}rank-3{{end}}">{{add $i 1}}</span></td>
+          <td><code>{{$s.Server}}</code></td>
+          <td><span class="lat" data-ms="{{printf "%.3f" $s.Avg}}">{{printf "%.3f" $s.Avg}} ms</span></td>
+        </tr>
         {{else}}
-        <tr><td colspan="3">No data yet.</td></tr>
+        <tr><td colspan="3" style="color:var(--text-dim);font-style:italic">No data yet.</td></tr>
         {{end}}
       </tbody>
       {{end}}
@@ -107,23 +197,33 @@
   </div>
 
   <div class="card">
-    <h2>Private / Local DNS Rankings</h2>
-    <p class="updated">All-time averages from history.csv</p>
+    <div class="card-header">
+      <h2 class="card-title">Private / Local DNS Rankings</h2>
+      <span class="card-meta">All-time averages · history.csv</span>
+    </div>
     <table>
-      <thead><tr><th>#</th><th>Server</th><th>Avg Latency (ms)</th></tr></thead>
+      <thead><tr><th>#</th><th>Server</th><th>Avg Latency</th></tr></thead>
       <tbody class="source-body" data-source="all">
         {{range $i, $s := .PrivateStats}}
-        <tr><td>{{add $i 1}}</td><td><code>{{$s.Server}}</code></td><td>{{printf "%.3f" $s.Avg}}</td></tr>
+        <tr>
+          <td><span class="rank-badge {{if eq $i 0}}rank-1{{else if eq $i 1}}rank-2{{else if eq $i 2}}rank-3{{end}}">{{add $i 1}}</span></td>
+          <td><code>{{$s.Server}}</code></td>
+          <td><span class="lat" data-ms="{{printf "%.3f" $s.Avg}}">{{printf "%.3f" $s.Avg}} ms</span></td>
+        </tr>
         {{else}}
-        <tr><td colspan="3">No data yet.</td></tr>
+        <tr><td colspan="3" style="color:var(--text-dim);font-style:italic">No data yet.</td></tr>
         {{end}}
       </tbody>
       {{range .Sources}}
       <tbody class="source-body" data-source="{{if .Source}}{{.Source}}{{else}}k3s-pod{{end}}" style="display:none">
         {{range $i, $s := .PrivateStats}}
-        <tr><td>{{add $i 1}}</td><td><code>{{$s.Server}}</code></td><td>{{printf "%.3f" $s.Avg}}</td></tr>
+        <tr>
+          <td><span class="rank-badge {{if eq $i 0}}rank-1{{else if eq $i 1}}rank-2{{else if eq $i 2}}rank-3{{end}}">{{add $i 1}}</span></td>
+          <td><code>{{$s.Server}}</code></td>
+          <td><span class="lat" data-ms="{{printf "%.3f" $s.Avg}}">{{printf "%.3f" $s.Avg}} ms</span></td>
+        </tr>
         {{else}}
-        <tr><td colspan="3">No data yet.</td></tr>
+        <tr><td colspan="3" style="color:var(--text-dim);font-style:italic">No data yet.</td></tr>
         {{end}}
       </tbody>
       {{end}}
@@ -131,31 +231,33 @@
   </div>
 
   <div class="card">
-    <h2>Individual Run Reports</h2>
-    <p class="section-subtitle">Latest 10 runs shown. Older runs are grouped by month.</p>
+    <div class="card-header">
+      <h2 class="card-title">Individual Run Reports</h2>
+      <span class="card-meta">Latest 10 shown · older runs grouped by month</span>
+    </div>
     <table>
       <thead><tr><th>Timestamp (UTC)</th><th>Report</th><th>Raw Data</th></tr></thead>
       <tbody>
         {{range .RecentRuns}}
         <tr>
-          <td>{{.Timestamp}}</td>
+          <td style="font-variant-numeric:tabular-nums;color:var(--text-mid);font-size:0.85rem">{{.Timestamp}}</td>
           <td><a href="{{.ReportFile}}">View Report</a></td>
           <td><a href="{{.CSVFile}}">Download CSV</a></td>
         </tr>
         {{else}}
-        <tr><td colspan="3">No run reports yet.</td></tr>
+        <tr><td colspan="3" style="color:var(--text-dim);font-style:italic">No run reports yet.</td></tr>
         {{end}}
       </tbody>
     </table>
     {{range .ArchivedMonths}}
     <details class="month-group">
-      <summary>{{.Label}} ({{len .Runs}} runs)</summary>
+      <summary>{{.Label}} <span style="font-weight:400;color:var(--text-dim)">({{len .Runs}} runs)</span></summary>
       <table>
         <thead><tr><th>Timestamp (UTC)</th><th>Report</th><th>Raw Data</th></tr></thead>
         <tbody>
           {{range .Runs}}
           <tr>
-            <td>{{.Timestamp}}</td>
+            <td style="font-variant-numeric:tabular-nums;color:var(--text-mid);font-size:0.85rem">{{.Timestamp}}</td>
             <td><a href="{{.ReportFile}}">View Report</a></td>
             <td><a href="{{.CSVFile}}">Download CSV</a></td>
           </tr>
@@ -168,130 +270,114 @@
 
 </main>
 
+<!-- Clear modal -->
 <div id="clearModal" class="modal">
   <div class="modal-content">
-    <h2>⚠️ Clear All Results?</h2>
-    <p>This will permanently delete all benchmark results, history, and reports. This action cannot be undone.</p>
+    <h2>Clear All Results?</h2>
+    <p>This permanently deletes all benchmark results, history, and reports. This cannot be undone.</p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="hideClearModal()">Cancel</button>
-      <button class="btn btn-danger" onclick="confirmClear()">Yes, Delete All</button>
+      <button class="btn btn-danger" onclick="confirmClear()">Delete All</button>
     </div>
     <div id="clearStatus"></div>
   </div>
 </div>
 
 <script>
-function showClearModal() {
-  document.getElementById('clearModal').classList.add('show');
-}
-
+function showClearModal() { document.getElementById('clearModal').classList.add('show'); }
 function hideClearModal() {
   document.getElementById('clearModal').classList.remove('show');
   document.getElementById('clearStatus').innerHTML = '';
 }
+document.addEventListener('click', e => { if (e.target === document.getElementById('clearModal')) hideClearModal(); });
 
 async function confirmClear() {
   const statusDiv = document.getElementById('clearStatus');
   const btn = event.target;
-  btn.disabled = true;
-  btn.textContent = 'Deleting...';
-
+  btn.disabled = true; btn.textContent = 'Deleting…';
   try {
-    const response = await fetch('/api/clear-results', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      statusDiv.innerHTML = `<p class="success-msg">✓ Successfully deleted ${data.deleted} files. Reloading...</p>`;
-      setTimeout(() => {
-        location.reload();
-      }, 1500);
+    const res = await fetch('/api/clear-results', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    const data = await res.json();
+    if (res.ok) {
+      statusDiv.innerHTML = `<p class="success-msg">Deleted ${data.deleted} files. Reloading…</p>`;
+      setTimeout(() => location.reload(), 1500);
     } else {
-      statusDiv.innerHTML = `<p class="error-msg">Error: ${data.error}</p>`;
-      btn.disabled = false;
-      btn.textContent = 'Yes, Delete All';
+      statusDiv.innerHTML = `<p class="error-msg">${data.error}</p>`;
+      btn.disabled = false; btn.textContent = 'Delete All';
     }
   } catch (err) {
-    statusDiv.innerHTML = `<p class="error-msg">Error: ${err.message}</p>`;
-    btn.disabled = false;
-    btn.textContent = 'Yes, Delete All';
+    statusDiv.innerHTML = `<p class="error-msg">${err.message}</p>`;
+    btn.disabled = false; btn.textContent = 'Delete All';
   }
 }
 
-// Close modal when clicking outside
-document.addEventListener('click', function(event) {
-  const modal = document.getElementById('clearModal');
-  if (event.target === modal) {
-    hideClearModal();
-  }
-});
+// Color-code latency pills after render
+function colorLatency() {
+  document.querySelectorAll('.lat[data-ms]').forEach(el => {
+    const ms = parseFloat(el.dataset.ms);
+    if (ms < 20)       el.classList.add('lat-good');
+    else if (ms < 50)  el.classList.add('lat-warn');
+    else if (ms > 0)   el.classList.add('lat-bad');
+    else               el.classList.add('lat-plain');
+  });
+}
+colorLatency();
 </script>
 
 <script>
-// Fetch history.csv at runtime — no inline embedding, no size growth
 const palette = [
-  '#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6',
+  '#3b82f6','#10b981','#f59e0b','#8b5cf6','#ef4444',
   '#06b6d4','#f97316','#84cc16','#ec4899','#6366f1',
   '#14b8a6','#a855f7','#fb923c','#22c55e','#e11d48'
 ];
 
 function isPrivate(server) {
   const plain = server.replace(/^(tls:\/\/|https?:\/\/)/, '').split('/')[0].split(':')[0];
-  if (/^192\.168\./.test(plain)) return true;
-  if (/^10\./.test(plain)) return true;
-  if (/^127\./.test(plain)) return true;
-  if (plain === 'localhost') return true;
+  if (/^192\.168\./.test(plain) || /^10\./.test(plain) || /^127\./.test(plain) || plain === 'localhost') return true;
   const m = plain.match(/^172\.(\d+)\./);
-  if (m) { const n = parseInt(m[1]); return n >= 16 && n <= 31; }
-  return false;
+  return m ? (parseInt(m[1]) >= 16 && parseInt(m[1]) <= 31) : false;
 }
 
 function buildDatasets(serverList, byServerByTime, timestamps) {
   return serverList.map((server, i) => ({
     label: server,
     data: timestamps.map(ts => {
-      const d = byServerByTime[server] && byServerByTime[server][ts];
+      const d = byServerByTime[server]?.[ts];
       return d ? +(d.sum / d.count).toFixed(3) : null;
     }),
     borderColor: palette[i % palette.length],
-    backgroundColor: palette[i % palette.length] + '22',
-    tension: 0.3,
+    backgroundColor: palette[i % palette.length] + '18',
+    tension: 0.35,
     spanGaps: true,
     pointRadius: 3,
+    pointHoverRadius: 5,
+    borderWidth: 2,
   }));
 }
 
-const chartOptions = {
+const chartDefaults = {
   responsive: true,
   maintainAspectRatio: false,
   interaction: { mode: 'index', intersect: false },
   plugins: {
-    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+    legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 }, padding: 16 } },
     tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y} ms` } }
   },
   scales: {
-    x: { ticks: { maxTicksLimit: 10, maxRotation: 30 } },
-    y: { title: { display: true, text: 'Avg Latency (ms)' }, beginAtZero: true }
+    x: { grid: { color: '#f1f5f9' }, ticks: { maxTicksLimit: 10, maxRotation: 30, font: { size: 11 }, color: '#94a3b8' } },
+    y: { grid: { color: '#f1f5f9' }, title: { display: true, text: 'Avg Latency (ms)', font: { size: 11 }, color: '#94a3b8' }, beginAtZero: true, ticks: { font: { size: 11 }, color: '#94a3b8' } }
   }
 };
 
-let rawRows = [];
-let publicChartInstance = null;
-let privateChartInstance = null;
+let rawRows = [], publicChartInst = null, privateChartInst = null;
 
 function buildChartData(sourceFilter) {
-  const byServerByTime = {};
-  const allTimestamps = new Set();
-
+  const byServerByTime = {}, allTimestamps = new Set();
   rawRows.forEach(rec => {
-    const [ts, server, , durStr, err, src] = rec;
+    const [ts, server,, durStr, err, src] = rec;
     if (sourceFilter !== 'all') {
       const rowSource = (src || '').trim();
-      const targetSource = sourceFilter === 'k3s-pod' ? '' : sourceFilter;
-      if (rowSource !== targetSource) return;
+      if (rowSource !== (sourceFilter === 'k3s-pod' ? '' : sourceFilter)) return;
     }
     if (err && err.trim()) return;
     const dur = parseFloat(durStr);
@@ -302,61 +388,75 @@ function buildChartData(sourceFilter) {
     byServerByTime[server][ts].sum += dur;
     byServerByTime[server][ts].count++;
   });
-
   return { byServerByTime, timestamps: [...allTimestamps].sort() };
 }
 
+function showEmpty(canvasId, message) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const wrap = canvas.closest('.chart-wrap');
+  const div = document.createElement('div');
+  div.className = 'chart-empty';
+  div.textContent = message;
+  if (wrap) {
+    wrap.replaceWith(div);
+  } else {
+    canvas.replaceWith(div);
+  }
+}
+
 function renderCharts(sourceFilter) {
-  if (publicChartInstance) { publicChartInstance.destroy(); publicChartInstance = null; }
-  if (privateChartInstance) { privateChartInstance.destroy(); privateChartInstance = null; }
+  if (publicChartInst)  { publicChartInst.destroy();  publicChartInst  = null; }
+  if (privateChartInst) { privateChartInst.destroy(); privateChartInst = null; }
 
   const { byServerByTime, timestamps } = buildChartData(sourceFilter);
   const servers = Object.keys(byServerByTime).sort();
   const publicServers  = servers.filter(s => !isPrivate(s));
   const privateServers = servers.filter(s =>  isPrivate(s));
 
-  publicChartInstance = new Chart(document.getElementById('publicChart'), {
-    type: 'line',
-    data: { labels: timestamps, datasets: buildDatasets(publicServers, byServerByTime, timestamps) },
-    options: chartOptions,
-  });
+  const pubCanvas  = document.getElementById('publicChart');
+  const privCanvas = document.getElementById('privateChart');
 
-  privateChartInstance = new Chart(document.getElementById('privateChart'), {
-    type: 'line',
-    data: { labels: timestamps, datasets: buildDatasets(privateServers, byServerByTime, timestamps) },
-    options: chartOptions,
-  });
+  if (pubCanvas) {
+    if (publicServers.length === 0) {
+      showEmpty('publicChart', 'No public DNS data yet');
+    } else {
+      publicChartInst = new Chart(pubCanvas, {
+        type: 'line',
+        data: { labels: timestamps, datasets: buildDatasets(publicServers, byServerByTime, timestamps) },
+        options: chartDefaults,
+      });
+    }
+  }
+
+  if (privCanvas) {
+    if (privateServers.length === 0) {
+      showEmpty('privateChart', 'No private DNS data yet');
+    } else {
+      privateChartInst = new Chart(privCanvas, {
+        type: 'line',
+        data: { labels: timestamps, datasets: buildDatasets(privateServers, byServerByTime, timestamps) },
+        options: chartDefaults,
+      });
+    }
+  }
 }
 
 function switchSource(sourceKey) {
-  document.querySelectorAll('.source-tab').forEach(tab => {
-    tab.classList.toggle('active', tab.dataset.source === sourceKey);
-  });
-  document.querySelectorAll('.source-body').forEach(tbody => {
-    tbody.style.display = tbody.dataset.source === sourceKey ? '' : 'none';
-  });
+  document.querySelectorAll('.source-tab').forEach(t => t.classList.toggle('active', t.dataset.source === sourceKey));
+  document.querySelectorAll('.source-body').forEach(b => b.style.display = b.dataset.source === sourceKey ? '' : 'none');
   renderCharts(sourceKey);
 }
 
 fetch('history.csv')
-  .then(r => {
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.text();
-  })
-  .then(csvText => {
-    rawRows = csvText.trim().split('\n').slice(1).filter(Boolean).map(row => row.split(','));
+  .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
+  .then(csv => {
+    rawRows = csv.trim().split('\n').slice(1).filter(Boolean).map(row => row.split(','));
     renderCharts('all');
   })
   .catch(err => {
-    ['publicChart', 'privateChart'].forEach(id => {
-      const canvas = document.getElementById(id);
-      if (canvas) {
-        const p = document.createElement('p');
-        p.className = 'error-msg';
-        p.textContent = `Could not load history.csv: ${err.message}`;
-        canvas.replaceWith(p);
-      }
-    });
+    showEmpty('publicChart',  `Could not load history.csv: ${err.message}`);
+    showEmpty('privateChart', `Could not load history.csv: ${err.message}`);
   });
 </script>
 </body>

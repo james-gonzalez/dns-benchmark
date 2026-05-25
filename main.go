@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -614,11 +615,28 @@ type ServerStats struct {
 	Max       time.Duration
 	TotalTime time.Duration
 	Avg       time.Duration // Pre-calculated for reports
+	P95       time.Duration // Pre-calculated for reports
+	P99       time.Duration // Pre-calculated for reports
 	LossPct   float64       // Pre-calculated for reports
+}
+
+func percentile(sorted []time.Duration, p float64) time.Duration {
+	if len(sorted) == 0 {
+		return 0
+	}
+	idx := int(math.Ceil(p/100.0*float64(len(sorted)))) - 1
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= len(sorted) {
+		idx = len(sorted) - 1
+	}
+	return sorted[idx]
 }
 
 func calculateStats(results []benchmark.Result) []*ServerStats {
 	statsMap := make(map[string]*ServerStats)
+	durationsMap := make(map[string][]time.Duration)
 
 	for _, res := range results {
 		s, ok := statsMap[res.Server]
@@ -638,6 +656,7 @@ func calculateStats(results []benchmark.Result) []*ServerStats {
 			if res.Duration > s.Max {
 				s.Max = res.Duration
 			}
+			durationsMap[res.Server] = append(durationsMap[res.Server], res.Duration)
 		}
 	}
 
@@ -645,6 +664,10 @@ func calculateStats(results []benchmark.Result) []*ServerStats {
 	for _, s := range statsMap {
 		if s.Success > 0 {
 			s.Avg = s.TotalTime / time.Duration(s.Success)
+			durations := durationsMap[s.Server]
+			sort.Slice(durations, func(i, j int) bool { return durations[i] < durations[j] })
+			s.P95 = percentile(durations, 95)
+			s.P99 = percentile(durations, 99)
 		}
 		s.LossPct = float64(s.Errors) / float64(s.Total) * 100
 		if s.Success == 0 {
@@ -672,12 +695,12 @@ func printTable(stats []*ServerStats, totalTime time.Duration) {
 	fmt.Printf("\nBenchmark Complete in %v\n\n", totalTime)
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-	if _, err := fmt.Fprintln(w, "RANK\tSERVER\tAVG LATENCY\tMIN\tMAX\tLOSS %"); err != nil {
+	if _, err := fmt.Fprintln(w, "RANK\tSERVER\tAVG LATENCY\tMIN\tMAX\tP95\tP99\tLOSS %"); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to write header: %v\n", err)
 	}
 
 	for i, s := range stats {
-		if _, err := fmt.Fprintf(w, "%d\t%s\t%v\t%v\t%v\t%.2f%%\n", i+1, s.Server, s.Avg, s.Min, s.Max, s.LossPct); err != nil {
+		if _, err := fmt.Fprintf(w, "%d\t%s\t%v\t%v\t%v\t%v\t%v\t%.2f%%\n", i+1, s.Server, s.Avg, s.Min, s.Max, s.P95, s.P99, s.LossPct); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to write row: %v\n", err)
 		}
 	}
@@ -869,6 +892,8 @@ const htmlReportTemplate = `
 					<th>Avg Latency</th>
 					<th>Min</th>
 					<th>Max</th>
+					<th>P95</th>
+					<th>P99</th>
 					<th>Loss %</th>
 				</tr>
 			</thead>
@@ -880,6 +905,8 @@ const htmlReportTemplate = `
 					<td>{{$s.Avg}}</td>
 					<td>{{$s.Min}}</td>
 					<td>{{$s.Max}}</td>
+					<td>{{$s.P95}}</td>
+					<td>{{$s.P99}}</td>
 					<td class="{{if gt $s.LossPct 5.0}}bad{{else}}good{{end}}">{{printf "%.2f" $s.LossPct}}%</td>
 				</tr>
 				{{end}}
