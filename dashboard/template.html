@@ -168,16 +168,18 @@
       <span class="card-meta">All-time averages · history.csv</span>
     </div>
     <table>
-      <thead><tr><th>#</th><th>Server</th><th>Avg Latency</th></tr></thead>
+      <thead><tr><th>#</th><th>Server</th><th>Avg Latency</th><th>P95</th><th>P99</th></tr></thead>
       <tbody class="source-body" data-source="all">
         {{range $i, $s := .PublicStats}}
         <tr>
           <td><span class="rank-badge {{if eq $i 0}}rank-1{{else if eq $i 1}}rank-2{{else if eq $i 2}}rank-3{{end}}">{{add $i 1}}</span></td>
           <td><code>{{$s.Server}}</code></td>
           <td><span class="lat" data-ms="{{printf "%.3f" $s.Avg}}">{{printf "%.3f" $s.Avg}} ms</span></td>
+          <td><span class="lat lat-plain">{{printf "%.3f" $s.P95}} ms</span></td>
+          <td><span class="lat lat-plain">{{printf "%.3f" $s.P99}} ms</span></td>
         </tr>
         {{else}}
-        <tr><td colspan="3" style="color:var(--text-dim);font-style:italic">No data yet.</td></tr>
+        <tr><td colspan="5" style="color:var(--text-dim);font-style:italic">No data yet.</td></tr>
         {{end}}
       </tbody>
       {{range .Sources}}
@@ -187,9 +189,11 @@
           <td><span class="rank-badge {{if eq $i 0}}rank-1{{else if eq $i 1}}rank-2{{else if eq $i 2}}rank-3{{end}}">{{add $i 1}}</span></td>
           <td><code>{{$s.Server}}</code></td>
           <td><span class="lat" data-ms="{{printf "%.3f" $s.Avg}}">{{printf "%.3f" $s.Avg}} ms</span></td>
+          <td><span class="lat lat-plain">{{printf "%.3f" $s.P95}} ms</span></td>
+          <td><span class="lat lat-plain">{{printf "%.3f" $s.P99}} ms</span></td>
         </tr>
         {{else}}
-        <tr><td colspan="3" style="color:var(--text-dim);font-style:italic">No data yet.</td></tr>
+        <tr><td colspan="5" style="color:var(--text-dim);font-style:italic">No data yet.</td></tr>
         {{end}}
       </tbody>
       {{end}}
@@ -202,16 +206,18 @@
       <span class="card-meta">All-time averages · history.csv</span>
     </div>
     <table>
-      <thead><tr><th>#</th><th>Server</th><th>Avg Latency</th></tr></thead>
+      <thead><tr><th>#</th><th>Server</th><th>Avg Latency</th><th>P95</th><th>P99</th></tr></thead>
       <tbody class="source-body" data-source="all">
         {{range $i, $s := .PrivateStats}}
         <tr>
           <td><span class="rank-badge {{if eq $i 0}}rank-1{{else if eq $i 1}}rank-2{{else if eq $i 2}}rank-3{{end}}">{{add $i 1}}</span></td>
           <td><code>{{$s.Server}}</code></td>
           <td><span class="lat" data-ms="{{printf "%.3f" $s.Avg}}">{{printf "%.3f" $s.Avg}} ms</span></td>
+          <td><span class="lat lat-plain">{{printf "%.3f" $s.P95}} ms</span></td>
+          <td><span class="lat lat-plain">{{printf "%.3f" $s.P99}} ms</span></td>
         </tr>
         {{else}}
-        <tr><td colspan="3" style="color:var(--text-dim);font-style:italic">No data yet.</td></tr>
+        <tr><td colspan="5" style="color:var(--text-dim);font-style:italic">No data yet.</td></tr>
         {{end}}
       </tbody>
       {{range .Sources}}
@@ -221,9 +227,11 @@
           <td><span class="rank-badge {{if eq $i 0}}rank-1{{else if eq $i 1}}rank-2{{else if eq $i 2}}rank-3{{end}}">{{add $i 1}}</span></td>
           <td><code>{{$s.Server}}</code></td>
           <td><span class="lat" data-ms="{{printf "%.3f" $s.Avg}}">{{printf "%.3f" $s.Avg}} ms</span></td>
+          <td><span class="lat lat-plain">{{printf "%.3f" $s.P95}} ms</span></td>
+          <td><span class="lat lat-plain">{{printf "%.3f" $s.P99}} ms</span></td>
         </tr>
         {{else}}
-        <tr><td colspan="3" style="color:var(--text-dim);font-style:italic">No data yet.</td></tr>
+        <tr><td colspan="5" style="color:var(--text-dim);font-style:italic">No data yet.</td></tr>
         {{end}}
       </tbody>
       {{end}}

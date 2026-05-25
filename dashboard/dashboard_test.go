@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -63,20 +64,14 @@ func TestIsRFC1918_172(t *testing.T) {
 }
 
 func TestBuildStats(t *testing.T) {
-	sums := map[string]float64{
-		"8.8.8.8":   100.0,
-		"1.1.1.1":   50.0,
-		"9.9.9.9":   75.0,
-		"zero-runs": 0.0,
-	}
-	counts := map[string]int{
-		"8.8.8.8":   2,
-		"1.1.1.1":   2,
-		"9.9.9.9":   3,
-		"zero-runs": 0,
+	durs := map[string][]float64{
+		"8.8.8.8":   {60.0, 40.0},
+		"1.1.1.1":   {30.0, 20.0},
+		"9.9.9.9":   {30.0, 20.0, 25.0},
+		"zero-runs": {},
 	}
 
-	stats := buildStats(sums, counts)
+	stats := buildStats(durs)
 
 	if len(stats) != 3 {
 		t.Errorf("expected 3 stats, got %d", len(stats))
@@ -93,8 +88,8 @@ func TestBuildStats(t *testing.T) {
 	if stats[1].Server != "9.9.9.9" {
 		t.Errorf("expected second server to be 9.9.9.9, got %s", stats[1].Server)
 	}
-	if stats[1].Avg != 25.0 {
-		t.Errorf("expected avg 25.0, got %f", stats[1].Avg)
+	if math.Abs(stats[1].Avg-25.0) > 0.001 {
+		t.Errorf("expected avg ~25.0, got %f", stats[1].Avg)
 	}
 
 	if stats[2].Server != "8.8.8.8" {
@@ -102,6 +97,14 @@ func TestBuildStats(t *testing.T) {
 	}
 	if stats[2].Avg != 50.0 {
 		t.Errorf("expected avg 50.0, got %f", stats[2].Avg)
+	}
+
+	// Check P95/P99 are populated
+	if stats[2].P95 == 0 {
+		t.Errorf("expected non-zero P95 for 8.8.8.8")
+	}
+	if stats[2].P99 == 0 {
+		t.Errorf("expected non-zero P99 for 8.8.8.8")
 	}
 }
 
@@ -116,78 +119,63 @@ func TestParseHistory(t *testing.T) {
 2026-05-01T10:00:06Z,9.9.9.9,example.com,40.0,timeout,raspi
 `
 
-	pubSums := map[string]float64{}
-	pubCounts := map[string]int{}
-	privSums := map[string]float64{}
-	privCounts := map[string]int{}
-	srcPubSums := map[string]map[string]float64{}
-	srcPubCounts := map[string]map[string]int{}
-	srcPrivSums := map[string]map[string]float64{}
-	srcPrivCounts := map[string]map[string]int{}
+	pubDurs := map[string][]float64{}
+	privDurs := map[string][]float64{}
+	srcPubDurs := map[string]map[string][]float64{}
+	srcPrivDurs := map[string]map[string][]float64{}
 
 	r := strings.NewReader(csvData)
-	err := parseHistory(r, pubSums, pubCounts, privSums, privCounts,
-		srcPubSums, srcPubCounts, srcPrivSums, srcPrivCounts)
+	err := parseHistory(r, pubDurs, privDurs, srcPubDurs, srcPrivDurs)
 	if err != nil {
 		t.Fatalf("parseHistory failed: %v", err)
 	}
 
 	// Check public servers
-	if pubSums["8.8.8.8"] != 56.0 {
-		t.Errorf("expected 8.8.8.8 sum 56.0, got %f", pubSums["8.8.8.8"])
+	if len(pubDurs["8.8.8.8"]) != 2 {
+		t.Errorf("expected 8.8.8.8 count 2, got %d", len(pubDurs["8.8.8.8"]))
 	}
-	if pubCounts["8.8.8.8"] != 2 {
-		t.Errorf("expected 8.8.8.8 count 2, got %d", pubCounts["8.8.8.8"])
+	var sum88 float64
+	for _, v := range pubDurs["8.8.8.8"] {
+		sum88 += v
 	}
-	if pubSums["1.1.1.1"] != 20.0 {
-		t.Errorf("expected 1.1.1.1 sum 20.0, got %f", pubSums["1.1.1.1"])
+	if sum88 != 56.0 {
+		t.Errorf("expected 8.8.8.8 sum 56.0, got %f", sum88)
 	}
-	if pubCounts["1.1.1.1"] != 1 {
-		t.Errorf("expected 1.1.1.1 count 1, got %d", pubCounts["1.1.1.1"])
+	if len(pubDurs["1.1.1.1"]) != 1 {
+		t.Errorf("expected 1.1.1.1 count 1, got %d", len(pubDurs["1.1.1.1"]))
 	}
 
 	// Check private servers
-	if privSums["192.168.1.1"] != 15.0 {
-		t.Errorf("expected 192.168.1.1 sum 15.0, got %f", privSums["192.168.1.1"])
-	}
-	if privCounts["192.168.1.1"] != 1 {
-		t.Errorf("expected 192.168.1.1 count 1, got %d", privCounts["192.168.1.1"])
+	if len(privDurs["192.168.1.1"]) != 1 || privDurs["192.168.1.1"][0] != 15.0 {
+		t.Errorf("expected 192.168.1.1 [15.0], got %v", privDurs["192.168.1.1"])
 	}
 
 	// Check per-source stats
-	if srcPubSums["raspi"]["8.8.8.8"] != 56.0 {
-		t.Errorf("expected raspi 8.8.8.8 sum 56.0, got %f", srcPubSums["raspi"]["8.8.8.8"])
+	if len(srcPubDurs["raspi"]["8.8.8.8"]) != 2 {
+		t.Errorf("expected raspi 8.8.8.8 count 2, got %d", len(srcPubDurs["raspi"]["8.8.8.8"]))
 	}
-	if srcPubCounts["raspi"]["8.8.8.8"] != 2 {
-		t.Errorf("expected raspi 8.8.8.8 count 2, got %d", srcPubCounts["raspi"]["8.8.8.8"])
+	if len(srcPubDurs["dietpi"]["1.1.1.1"]) != 1 || srcPubDurs["dietpi"]["1.1.1.1"][0] != 20.0 {
+		t.Errorf("expected dietpi 1.1.1.1 [20.0], got %v", srcPubDurs["dietpi"]["1.1.1.1"])
 	}
-	if srcPubSums["dietpi"]["1.1.1.1"] != 20.0 {
-		t.Errorf("expected dietpi 1.1.1.1 sum 20.0, got %f", srcPubSums["dietpi"]["1.1.1.1"])
-	}
-	if srcPrivSums["k3s-pod"]["192.168.1.1"] != 15.0 {
-		t.Errorf("expected k3s-pod 192.168.1.1 sum 15.0, got %f", srcPrivSums["k3s-pod"]["192.168.1.1"])
+	if len(srcPrivDurs["k3s-pod"]["192.168.1.1"]) != 1 {
+		t.Errorf("expected k3s-pod 192.168.1.1 count 1, got %d", len(srcPrivDurs["k3s-pod"]["192.168.1.1"]))
 	}
 }
 
 func TestParseHistoryEmptyFile(t *testing.T) {
-	pubSums := map[string]float64{}
-	pubCounts := map[string]int{}
-	privSums := map[string]float64{}
-	privCounts := map[string]int{}
-	srcPubSums := map[string]map[string]float64{}
-	srcPubCounts := map[string]map[string]int{}
-	srcPrivSums := map[string]map[string]float64{}
-	srcPrivCounts := map[string]map[string]int{}
+	pubDurs := map[string][]float64{}
+	privDurs := map[string][]float64{}
+	srcPubDurs := map[string]map[string][]float64{}
+	srcPrivDurs := map[string]map[string][]float64{}
 
 	r := strings.NewReader("")
-	err := parseHistory(r, pubSums, pubCounts, privSums, privCounts,
-		srcPubSums, srcPubCounts, srcPrivSums, srcPrivCounts)
+	err := parseHistory(r, pubDurs, privDurs, srcPubDurs, srcPrivDurs)
 	if err != nil {
 		t.Fatalf("parseHistory on empty file should not error: %v", err)
 	}
 
-	if len(pubSums) != 0 {
-		t.Errorf("expected empty pubSums, got %d entries", len(pubSums))
+	if len(pubDurs) != 0 {
+		t.Errorf("expected empty pubDurs, got %d entries", len(pubDurs))
 	}
 }
 
@@ -196,27 +184,22 @@ func TestParseHistoryWithoutSource(t *testing.T) {
 2026-05-01T10:00:00Z,8.8.8.8,example.com,25.5,
 `
 
-	pubSums := map[string]float64{}
-	pubCounts := map[string]int{}
-	privSums := map[string]float64{}
-	privCounts := map[string]int{}
-	srcPubSums := map[string]map[string]float64{}
-	srcPubCounts := map[string]map[string]int{}
-	srcPrivSums := map[string]map[string]float64{}
-	srcPrivCounts := map[string]map[string]int{}
+	pubDurs := map[string][]float64{}
+	privDurs := map[string][]float64{}
+	srcPubDurs := map[string]map[string][]float64{}
+	srcPrivDurs := map[string]map[string][]float64{}
 
 	r := strings.NewReader(csvData)
-	err := parseHistory(r, pubSums, pubCounts, privSums, privCounts,
-		srcPubSums, srcPubCounts, srcPrivSums, srcPrivCounts)
+	err := parseHistory(r, pubDurs, privDurs, srcPubDurs, srcPrivDurs)
 	if err != nil {
 		t.Fatalf("parseHistory failed: %v", err)
 	}
 
-	if pubSums["8.8.8.8"] != 25.5 {
-		t.Errorf("expected 8.8.8.8 sum 25.5, got %f", pubSums["8.8.8.8"])
+	if len(pubDurs["8.8.8.8"]) != 1 || pubDurs["8.8.8.8"][0] != 25.5 {
+		t.Errorf("expected 8.8.8.8 [25.5], got %v", pubDurs["8.8.8.8"])
 	}
-	if len(srcPubSums) != 0 {
-		t.Errorf("expected no per-source stats without source column, got %d", len(srcPubSums))
+	if len(srcPubDurs) != 0 {
+		t.Errorf("expected no per-source stats without source column, got %d", len(srcPubDurs))
 	}
 }
 

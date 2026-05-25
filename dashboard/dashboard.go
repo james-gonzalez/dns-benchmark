@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -29,6 +30,8 @@ type RunEntry struct {
 type ServerStat struct {
 	Server string
 	Avg    float64
+	P95    float64
+	P99    float64
 }
 
 // SourceStats holds per-source server stats for the filter tabs.
@@ -85,15 +88,11 @@ func isRFC1918_172(ip string) bool {
 func Generate(resultsDir string) error {
 	historyPath := filepath.Join(resultsDir, "history.csv")
 
-	publicSums := map[string]float64{}
-	publicCounts := map[string]int{}
-	privateSums := map[string]float64{}
-	privateCounts := map[string]int{}
-	// per-source: source -> server -> sum/count
-	srcPubSums := map[string]map[string]float64{}
-	srcPubCounts := map[string]map[string]int{}
-	srcPrivSums := map[string]map[string]float64{}
-	srcPrivCounts := map[string]map[string]int{}
+	pubDurs := map[string][]float64{}
+	privDurs := map[string][]float64{}
+	// per-source: source -> server -> durations
+	srcPubDurs := map[string]map[string][]float64{}
+	srcPrivDurs := map[string]map[string][]float64{}
 
 	f, err := os.Open(historyPath)
 	if err != nil && !os.IsNotExist(err) {
@@ -105,25 +104,24 @@ func Generate(resultsDir string) error {
 				fmt.Fprintf(os.Stderr, "warning: closing history.csv: %v\n", cerr)
 			}
 		}()
-		if err := parseHistory(f, publicSums, publicCounts, privateSums, privateCounts,
-			srcPubSums, srcPubCounts, srcPrivSums, srcPrivCounts); err != nil {
+		if err := parseHistory(f, pubDurs, privDurs, srcPubDurs, srcPrivDurs); err != nil {
 			return fmt.Errorf("parsing history.csv: %w", err)
 		}
 	}
 
-	publicStats := buildStats(publicSums, publicCounts)
-	privateStats := buildStats(privateSums, privateCounts)
+	publicStats := buildStats(pubDurs)
+	privateStats := buildStats(privDurs)
 
 	// Build per-source stats, sorted by source name.
-	sourceNames := make([]string, 0, len(srcPubSums))
+	sourceNames := make([]string, 0, len(srcPubDurs))
 	seen := map[string]bool{}
-	for s := range srcPubSums {
+	for s := range srcPubDurs {
 		if !seen[s] {
 			seen[s] = true
 			sourceNames = append(sourceNames, s)
 		}
 	}
-	for s := range srcPrivSums {
+	for s := range srcPrivDurs {
 		if !seen[s] {
 			seen[s] = true
 			sourceNames = append(sourceNames, s)
@@ -135,8 +133,8 @@ func Generate(resultsDir string) error {
 	for _, src := range sourceNames {
 		sources = append(sources, SourceStats{
 			Source:       src,
-			PublicStats:  buildStats(srcPubSums[src], srcPubCounts[src]),
-			PrivateStats: buildStats(srcPrivSums[src], srcPrivCounts[src]),
+			PublicStats:  buildStats(srcPubDurs[src]),
+			PrivateStats: buildStats(srcPrivDurs[src]),
 		})
 	}
 
@@ -175,9 +173,9 @@ func Generate(resultsDir string) error {
 	return tmpl.Execute(out, data)
 }
 
-func parseHistory(r io.Reader, pubSums map[string]float64, pubCounts map[string]int, privSums map[string]float64, privCounts map[string]int,
-	srcPubSums map[string]map[string]float64, srcPubCounts map[string]map[string]int,
-	srcPrivSums map[string]map[string]float64, srcPrivCounts map[string]map[string]int) error {
+func parseHistory(r io.Reader,
+	pubDurs map[string][]float64, privDurs map[string][]float64,
+	srcPubDurs map[string]map[string][]float64, srcPrivDurs map[string]map[string][]float64) error {
 	cr := csv.NewReader(r)
 	cr.FieldsPerRecord = -1 // tolerate variable columns
 
@@ -198,11 +196,7 @@ func parseHistory(r io.Reader, pubSums map[string]float64, pubCounts map[string]
 		if len(rec) < 4 {
 			continue
 		}
-		errField := ""
-		if len(rec) >= 5 {
-			errField = strings.TrimSpace(rec[4])
-		}
-		if errField != "" {
+		if len(rec) >= 5 && strings.TrimSpace(rec[4]) != "" {
 			continue
 		}
 		server := rec[1]
@@ -216,42 +210,58 @@ func parseHistory(r io.Reader, pubSums map[string]float64, pubCounts map[string]
 		}
 
 		if isPrivate(server) {
-			privSums[server] += dur
-			privCounts[server]++
+			privDurs[server] = append(privDurs[server], dur)
 			if source != "" {
-				if srcPrivSums[source] == nil {
-					srcPrivSums[source] = map[string]float64{}
-					srcPrivCounts[source] = map[string]int{}
+				if srcPrivDurs[source] == nil {
+					srcPrivDurs[source] = map[string][]float64{}
 				}
-				srcPrivSums[source][server] += dur
-				srcPrivCounts[source][server]++
+				srcPrivDurs[source][server] = append(srcPrivDurs[source][server], dur)
 			}
 		} else {
-			pubSums[server] += dur
-			pubCounts[server]++
+			pubDurs[server] = append(pubDurs[server], dur)
 			if source != "" {
-				if srcPubSums[source] == nil {
-					srcPubSums[source] = map[string]float64{}
-					srcPubCounts[source] = map[string]int{}
+				if srcPubDurs[source] == nil {
+					srcPubDurs[source] = map[string][]float64{}
 				}
-				srcPubSums[source][server] += dur
-				srcPubCounts[source][server]++
+				srcPubDurs[source][server] = append(srcPubDurs[source][server], dur)
 			}
 		}
 	}
 	return nil
 }
 
-func buildStats(sums map[string]float64, counts map[string]int) []ServerStat {
-	stats := make([]ServerStat, 0, len(sums))
-	for server, sum := range sums {
-		c := counts[server]
-		if c == 0 {
+func percentileFloat(sorted []float64, p float64) float64 {
+	if len(sorted) == 0 {
+		return 0
+	}
+	idx := int(math.Ceil(p/100.0*float64(len(sorted)))) - 1
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= len(sorted) {
+		idx = len(sorted) - 1
+	}
+	return sorted[idx]
+}
+
+func buildStats(durs map[string][]float64) []ServerStat {
+	stats := make([]ServerStat, 0, len(durs))
+	for server, d := range durs {
+		if len(d) == 0 {
 			continue
+		}
+		sorted := make([]float64, len(d))
+		copy(sorted, d)
+		sort.Float64s(sorted)
+		var sum float64
+		for _, v := range sorted {
+			sum += v
 		}
 		stats = append(stats, ServerStat{
 			Server: server,
-			Avg:    sum / float64(c),
+			Avg:    sum / float64(len(sorted)),
+			P95:    percentileFloat(sorted, 95),
+			P99:    percentileFloat(sorted, 99),
 		})
 	}
 	sort.Slice(stats, func(i, j int) bool {
